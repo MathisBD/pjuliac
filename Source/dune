@@ -1,0 +1,7 @@
+(ocamllex lexer)
+(executable
+ (name pjuliac)
+ (libraries str))
+(env
+ (dev
+  (flags (:standard -warn-error -A))))
