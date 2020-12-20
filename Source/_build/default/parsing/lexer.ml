@@ -1,4 +1,4 @@
-# 1 "lexer.mll"
+# 1 "parsing/lexer.mll"
  
   open Lexing
   
@@ -51,7 +51,7 @@
         | _ -> false
       end
 
-# 55 "lexer.ml"
+# 55 "parsing/lexer.ml"
 let __ocaml_lex_tables = {
   Lexing.lex_base =
    "\000\000\222\255\223\255\001\000\001\000\002\000\003\000\030\000\
@@ -392,12 +392,12 @@ let rec token lexbuf =
 and __ocaml_lex_token_rec lexbuf __ocaml_lex_state =
   match Lexing.new_engine __ocaml_lex_tables __ocaml_lex_state lexbuf with
       | 0 ->
-# 62 "lexer.mll"
+# 62 "parsing/lexer.mll"
                ( token lexbuf )
-# 398 "lexer.ml"
+# 398 "parsing/lexer.ml"
 
   | 1 ->
-# 63 "lexer.mll"
+# 63 "parsing/lexer.mll"
          (
     if should_insert_semicolon () then begin
       (* postpone the new_line call so that the semicolon
@@ -410,15 +410,15 @@ and __ocaml_lex_token_rec lexbuf __ocaml_lex_state =
       token lexbuf
     end
   )
-# 414 "lexer.ml"
+# 414 "parsing/lexer.ml"
 
   | 2 ->
-# 75 "lexer.mll"
+# 75 "parsing/lexer.mll"
         ( comment lexbuf )
-# 419 "lexer.ml"
+# 419 "parsing/lexer.ml"
 
   | 3 ->
-# 77 "lexer.mll"
+# 77 "parsing/lexer.mll"
         ( 
     let start_p = lexbuf.lex_start_p in
     let s = str [] lexbuf in 
@@ -427,214 +427,214 @@ and __ocaml_lex_token_rec lexbuf __ocaml_lex_state =
     lexbuf.lex_start_p <- start_p;
     STRING s 
   )
-# 431 "lexer.ml"
+# 431 "parsing/lexer.ml"
 
   | 4 ->
 let
-# 85 "lexer.mll"
+# 85 "parsing/lexer.mll"
            n
-# 437 "lexer.ml"
+# 437 "parsing/lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_start_pos lexbuf.Lexing.lex_curr_pos in
-# 85 "lexer.mll"
+# 85 "parsing/lexer.mll"
              ( INT (Int64.of_string n) )
-# 441 "lexer.ml"
+# 441 "parsing/lexer.ml"
 
   | 5 ->
 let
-# 86 "lexer.mll"
+# 86 "parsing/lexer.mll"
              i
-# 447 "lexer.ml"
+# 447 "parsing/lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_start_pos lexbuf.Lexing.lex_curr_pos in
-# 86 "lexer.mll"
+# 86 "parsing/lexer.mll"
                (
     (* keyword *)
     try Hashtbl.find keywords i
     (* variable *)
     with Not_found -> IDENT i
   )
-# 456 "lexer.ml"
+# 456 "parsing/lexer.ml"
 
   | 6 ->
 let
-# 92 "lexer.mll"
+# 92 "parsing/lexer.mll"
             n
-# 462 "lexer.ml"
+# 462 "parsing/lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_start_pos lexbuf.Lexing.lex_mem.(0)
 and
-# 92 "lexer.mll"
+# 92 "parsing/lexer.mll"
                          i
-# 467 "lexer.ml"
+# 467 "parsing/lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_mem.(0) lexbuf.Lexing.lex_curr_pos in
-# 92 "lexer.mll"
+# 92 "parsing/lexer.mll"
                             (
     if Hashtbl.mem keywords i 
     then error "can't concat int and reserved keyword"
     else INT_IDENT ((Int64.of_string n), i)
   )
-# 475 "lexer.ml"
+# 475 "parsing/lexer.ml"
 
   | 7 ->
 let
-# 97 "lexer.mll"
+# 97 "parsing/lexer.mll"
               i
-# 481 "lexer.ml"
+# 481 "parsing/lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_start_pos (lexbuf.Lexing.lex_curr_pos + -1) in
-# 97 "lexer.mll"
+# 97 "parsing/lexer.mll"
                      ( 
     if Hashtbl.mem keywords i
     then error "can't concat reserved keyword and left parenthesis"
     else IDENT_LP i
   )
-# 489 "lexer.ml"
+# 489 "parsing/lexer.ml"
 
   | 8 ->
 let
-# 102 "lexer.mll"
+# 102 "parsing/lexer.mll"
                   i
-# 495 "lexer.ml"
+# 495 "parsing/lexer.ml"
 = Lexing.sub_lexeme lexbuf (lexbuf.Lexing.lex_start_pos + 1) lexbuf.Lexing.lex_curr_pos in
-# 102 "lexer.mll"
+# 102 "parsing/lexer.mll"
                      (
     if Hashtbl.mem keywords i
     then error "can't concat right parenthesis and reserved keyword"
     else RP_IDENT i
   )
-# 503 "lexer.ml"
+# 503 "parsing/lexer.ml"
 
   | 9 ->
 let
-# 107 "lexer.mll"
+# 107 "parsing/lexer.mll"
             n
-# 509 "lexer.ml"
+# 509 "parsing/lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_start_pos (lexbuf.Lexing.lex_curr_pos + -1) in
-# 107 "lexer.mll"
+# 107 "parsing/lexer.mll"
                    ( INT_LP (Int64.of_string n) )
-# 513 "lexer.ml"
+# 513 "parsing/lexer.ml"
 
   | 10 ->
-# 109 "lexer.mll"
+# 109 "parsing/lexer.mll"
         ( LP )
-# 518 "lexer.ml"
+# 518 "parsing/lexer.ml"
 
   | 11 ->
-# 110 "lexer.mll"
+# 110 "parsing/lexer.mll"
         ( RP )
-# 523 "lexer.ml"
+# 523 "parsing/lexer.ml"
 
   | 12 ->
-# 111 "lexer.mll"
+# 111 "parsing/lexer.mll"
         ( COLON )
-# 528 "lexer.ml"
+# 528 "parsing/lexer.ml"
 
   | 13 ->
-# 112 "lexer.mll"
+# 112 "parsing/lexer.mll"
          ( DOUBLECOLON )
-# 533 "lexer.ml"
+# 533 "parsing/lexer.ml"
 
   | 14 ->
-# 113 "lexer.mll"
+# 113 "parsing/lexer.mll"
         ( SEMICOLON )
-# 538 "lexer.ml"
+# 538 "parsing/lexer.ml"
 
   | 15 ->
-# 114 "lexer.mll"
+# 114 "parsing/lexer.mll"
         ( COMMA )
-# 543 "lexer.ml"
+# 543 "parsing/lexer.ml"
 
   | 16 ->
-# 115 "lexer.mll"
+# 115 "parsing/lexer.mll"
         ( DOT )
-# 548 "lexer.ml"
+# 548 "parsing/lexer.ml"
 
   | 17 ->
-# 116 "lexer.mll"
+# 116 "parsing/lexer.mll"
         ( EQUAL )
-# 553 "lexer.ml"
+# 553 "parsing/lexer.ml"
 
   | 18 ->
-# 117 "lexer.mll"
+# 117 "parsing/lexer.mll"
         ( ADD )
-# 558 "lexer.ml"
+# 558 "parsing/lexer.ml"
 
   | 19 ->
-# 118 "lexer.mll"
+# 118 "parsing/lexer.mll"
         ( SUB )
-# 563 "lexer.ml"
+# 563 "parsing/lexer.ml"
 
   | 20 ->
-# 119 "lexer.mll"
+# 119 "parsing/lexer.mll"
         ( MUL )
-# 568 "lexer.ml"
+# 568 "parsing/lexer.ml"
 
   | 21 ->
-# 120 "lexer.mll"
+# 120 "parsing/lexer.mll"
         ( MOD )
-# 573 "lexer.ml"
+# 573 "parsing/lexer.ml"
 
   | 22 ->
-# 121 "lexer.mll"
+# 121 "parsing/lexer.mll"
         ( POW )
-# 578 "lexer.ml"
+# 578 "parsing/lexer.ml"
 
   | 23 ->
-# 122 "lexer.mll"
+# 122 "parsing/lexer.mll"
         ( NOT )
-# 583 "lexer.ml"
+# 583 "parsing/lexer.ml"
 
   | 24 ->
-# 123 "lexer.mll"
+# 123 "parsing/lexer.mll"
          ( EQ )
-# 588 "lexer.ml"
+# 588 "parsing/lexer.ml"
 
   | 25 ->
-# 124 "lexer.mll"
+# 124 "parsing/lexer.mll"
          ( NEQ )
-# 593 "lexer.ml"
+# 593 "parsing/lexer.ml"
 
   | 26 ->
-# 125 "lexer.mll"
+# 125 "parsing/lexer.mll"
          ( LT )
-# 598 "lexer.ml"
+# 598 "parsing/lexer.ml"
 
   | 27 ->
-# 126 "lexer.mll"
+# 126 "parsing/lexer.mll"
          ( LEQ )
-# 603 "lexer.ml"
+# 603 "parsing/lexer.ml"
 
   | 28 ->
-# 127 "lexer.mll"
+# 127 "parsing/lexer.mll"
          ( GT )
-# 608 "lexer.ml"
+# 608 "parsing/lexer.ml"
 
   | 29 ->
-# 128 "lexer.mll"
+# 128 "parsing/lexer.mll"
          ( GEQ )
-# 613 "lexer.ml"
+# 613 "parsing/lexer.ml"
 
   | 30 ->
-# 129 "lexer.mll"
+# 129 "parsing/lexer.mll"
          ( AND )
-# 618 "lexer.ml"
+# 618 "parsing/lexer.ml"
 
   | 31 ->
-# 130 "lexer.mll"
+# 130 "parsing/lexer.mll"
          ( OR )
-# 623 "lexer.ml"
+# 623 "parsing/lexer.ml"
 
   | 32 ->
 let
-# 132 "lexer.mll"
+# 132 "parsing/lexer.mll"
          c
-# 629 "lexer.ml"
+# 629 "parsing/lexer.ml"
 = Lexing.sub_lexeme_char lexbuf lexbuf.Lexing.lex_start_pos in
-# 132 "lexer.mll"
+# 132 "parsing/lexer.mll"
            ( error ("Unexpected character " ^ (String.make 1 c)) )
-# 633 "lexer.ml"
+# 633 "parsing/lexer.ml"
 
   | 33 ->
-# 133 "lexer.mll"
+# 133 "parsing/lexer.mll"
         ( EOF )
-# 638 "lexer.ml"
+# 638 "parsing/lexer.ml"
 
   | __ocaml_lex_state -> lexbuf.Lexing.refill_buff lexbuf;
       __ocaml_lex_token_rec lexbuf __ocaml_lex_state
@@ -644,7 +644,7 @@ and comment lexbuf =
 and __ocaml_lex_comment_rec lexbuf __ocaml_lex_state =
   match Lexing.engine __ocaml_lex_tables __ocaml_lex_state lexbuf with
       | 0 ->
-# 136 "lexer.mll"
+# 136 "parsing/lexer.mll"
          (
     (* don't forget to insert semicolons here too ! *)
     if should_insert_semicolon () then begin
@@ -656,17 +656,17 @@ and __ocaml_lex_comment_rec lexbuf __ocaml_lex_state =
       token lexbuf
     end
   )
-# 660 "lexer.ml"
+# 660 "parsing/lexer.ml"
 
   | 1 ->
-# 147 "lexer.mll"
+# 147 "parsing/lexer.mll"
         ( error "eof in comment" )
-# 665 "lexer.ml"
+# 665 "parsing/lexer.ml"
 
   | 2 ->
-# 148 "lexer.mll"
+# 148 "parsing/lexer.mll"
       ( comment lexbuf )
-# 670 "lexer.ml"
+# 670 "parsing/lexer.ml"
 
   | __ocaml_lex_state -> lexbuf.Lexing.refill_buff lexbuf;
       __ocaml_lex_comment_rec lexbuf __ocaml_lex_state
@@ -676,69 +676,69 @@ and str acc lexbuf =
 and __ocaml_lex_str_rec acc lexbuf __ocaml_lex_state =
   match Lexing.engine __ocaml_lex_tables __ocaml_lex_state lexbuf with
       | 0 ->
-# 151 "lexer.mll"
+# 151 "parsing/lexer.mll"
         ( 
     let chars = List.map (String.make 1) (List.rev acc) in 
     String.concat "" chars
   )
-# 685 "lexer.ml"
+# 685 "parsing/lexer.ml"
 
   | 1 ->
-# 155 "lexer.mll"
+# 155 "parsing/lexer.mll"
         ( error "eof in string" )
-# 690 "lexer.ml"
+# 690 "parsing/lexer.ml"
 
   | 2 ->
-# 156 "lexer.mll"
+# 156 "parsing/lexer.mll"
            ( str ('\\' :: acc) lexbuf )
-# 695 "lexer.ml"
+# 695 "parsing/lexer.ml"
 
   | 3 ->
-# 157 "lexer.mll"
+# 157 "parsing/lexer.mll"
           ( str ('\n' :: acc) lexbuf )
-# 700 "lexer.ml"
+# 700 "parsing/lexer.ml"
 
   | 4 ->
-# 158 "lexer.mll"
+# 158 "parsing/lexer.mll"
            ( str ('"' :: acc) lexbuf )
-# 705 "lexer.ml"
+# 705 "parsing/lexer.ml"
 
   | 5 ->
-# 159 "lexer.mll"
+# 159 "parsing/lexer.mll"
           ( str ('\t' :: acc) lexbuf )
-# 710 "lexer.ml"
+# 710 "parsing/lexer.ml"
 
   | 6 ->
-# 160 "lexer.mll"
+# 160 "parsing/lexer.mll"
          ( error "Backslash '\\' in string must be part of a valid espace sequence" )
-# 715 "lexer.ml"
+# 715 "parsing/lexer.ml"
 
   | 7 ->
 let
-# 161 "lexer.mll"
+# 161 "parsing/lexer.mll"
                        c
-# 721 "lexer.ml"
+# 721 "parsing/lexer.ml"
 = Lexing.sub_lexeme_char lexbuf lexbuf.Lexing.lex_start_pos in
-# 161 "lexer.mll"
+# 161 "parsing/lexer.mll"
                          ( str (c :: acc) lexbuf )
-# 725 "lexer.ml"
+# 725 "parsing/lexer.ml"
 
   | 8 ->
 let
-# 162 "lexer.mll"
+# 162 "parsing/lexer.mll"
          c
-# 731 "lexer.ml"
+# 731 "parsing/lexer.ml"
 = Lexing.sub_lexeme_char lexbuf lexbuf.Lexing.lex_start_pos in
-# 162 "lexer.mll"
+# 162 "parsing/lexer.mll"
            ( error "Unexpected character in string : " ^ String.make 1 c )
-# 735 "lexer.ml"
+# 735 "parsing/lexer.ml"
 
   | __ocaml_lex_state -> lexbuf.Lexing.refill_buff lexbuf;
       __ocaml_lex_str_rec acc lexbuf __ocaml_lex_state
 
 ;;
 
-# 164 "lexer.mll"
+# 164 "parsing/lexer.mll"
   
   let lex lexbuf =
     if !inserted_semicolon then
@@ -751,4 +751,4 @@ let
       | IF when !prev_tok = (Some ELSE) -> error "else and if keywords should be concatenated in elseif"
       | _ -> prev_tok := Some t; t
 
-# 755 "lexer.ml"
+# 755 "parsing/lexer.ml"
