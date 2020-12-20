@@ -80,6 +80,11 @@ let var_type = function
   | FuncParam fp -> fp.ty
   | LoopVar _ -> Tint64
 
+let var_name = function
+  | Global g -> g.name
+  | StackLocal sl -> sl.name
+  | FuncParam fp -> fp.name
+  | LoopVar lv -> lv.name
 
 (*** PRINTING ***)
 
@@ -209,11 +214,12 @@ and pp_multiple_vars fmt prefix is_last var_list =
   loop var_list
 
 and pp_func fmt prefix is_last f =
-  fprintf fmt "%s Func %s :: %s\n" 
+  fprintf fmt "%s Func name=%s frame_size=%d\n" 
     (prefix ^ ni is_last) 
     f.fname 
-    (type_to_string f.ret_type);
+    f.frame_size;
   List.iter (pp_param_type fmt (prefix ^ ci is_last) false) f.param_types;
+  fprintf fmt "%s ReturnType %s\n" (prefix ^ ci is_last ^ ni false) (type_to_string f.ret_type);
   pp_expr fmt (prefix ^ ci is_last) true f.code
 
 and pp_param_type fmt prefix is_last ty =
@@ -240,7 +246,9 @@ and pp_field fmt prefix is_last (x, ty) =
     (type_to_string ty)
 
 and pp_decl fmt prefix is_last = function
-  | TDexpr e -> pp_expr fmt prefix is_last e
+  | TDexpr (e, fs) -> 
+    fprintf fmt "%s TDExpr frame_size=%d\n" (prefix ^ ni is_last) fs;
+    pp_expr fmt (prefix ^ ci is_last) true e;
   | TDfunc f -> pp_func fmt prefix is_last f
   | TDstruct s -> pp_struct fmt prefix is_last s
 

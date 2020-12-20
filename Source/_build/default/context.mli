@@ -8,6 +8,9 @@ val close_scope : t -> unit
 val has_local_scope : t -> bool
 val outer_scope : t -> Type_ast.var list
 
+val frame_size : t -> int
+val update_frame_size : t -> unit
+
 (* ty is the return type of the function *)
 val enter_func : t -> Type.ty -> unit
 val leave_func : t -> unit

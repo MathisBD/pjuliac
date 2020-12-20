@@ -10,9 +10,6 @@ module Context = Dune__exe__Context
 (** @canonical Dune__exe.Lexer *)
 module Lexer = Dune__exe__Lexer
 
-(** @canonical Dune__exe.Memory_layout *)
-module Memory_layout = Dune__exe__Memory_layout
-
 (** @canonical Dune__exe.Parser *)
 module Parser = Dune__exe__Parser
 

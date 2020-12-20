@@ -69,7 +69,7 @@ let outer_scope ctx =
 let frame_size ctx = ctx.frame_size
 
 let update_frame_size ctx =
-  ctx.frame_size = ctx.stack_size
+  ctx.frame_size <- ctx.stack_size
 
 
 (*** FUNCTIONS ***)

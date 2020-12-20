@@ -39,7 +39,7 @@ echo "Partie 1"
 
 # les mauvais
 echo -n "mauvais "
-for f in syntax/bad/*.jl; do
+for f in tests/syntax/bad/*.jl; do
     echo -n ".";
     max=`expr $max + 1`;
     compile --parse-only $f;
@@ -57,7 +57,7 @@ echo
 
 # les bons
 echo -n "bons "
-for f in syntax/good/*.jl typing/bad/*.jl typing/good/*.jl exec/*.jl exec-fail/*.jl; do
+for f in tests/syntax/good/*.jl tests/typing/bad/*.jl tests/typing/good/*.jl tests/exec/*.jl tests/exec-fail/*.jl; do
     echo -n ".";
     max=`expr $max + 1`;
     compile --parse-only $f;
@@ -90,7 +90,7 @@ max=0
 
 # les mauvais
 echo -n "mauvais "
-for f in typing/bad/*.jl; do
+for f in tests/typing/bad/*.jl; do
     echo -n ".";
     max=`expr $max + 1`;
     compile --type-only $f;
@@ -108,7 +108,7 @@ echo
 
 # les bons
 echo -n "bons "
-for f in typing/good/*.jl exec/*.jl exec-fail/*.jl; do
+for f in tests/typing/good/*.jl tests/exec/*.jl tests/exec-fail/*.jl; do
     echo -n ".";
     max=`expr $max + 1`;
     compile --type-only $f;
@@ -147,11 +147,11 @@ echo "-----------------"
 
 timeout="why3-cpulimit 30 0 -h"
 
-for f in exec/*.jl; do
+for f in tests/exec/*.jl; do
     echo -n "."
-    asm=exec/`basename $f .jl`.s
+    asm=tests/exec/`basename $f .jl`.s
     rm -f $asm
-    expected=exec/`basename $f .jl`.out
+    expected=tests/exec/`basename $f .jl`.out
     max=`expr $max + 1`;
     if compile $f; then
 	rm -f out
@@ -178,9 +178,9 @@ echo
 echo "Execution conduisant à un échec"
 echo "-------------------------------"
 
-for f in exec-fail/*.jl; do
+for f in tests/exec-fail/*.jl; do
     echo -n "."
-    asm=exec-fail/`basename $f .jl`.s
+    asm=tests/exec-fail/`basename $f .jl`.s
     rm -f $asm
     max=`expr $max + 1`;
     if compile $f && gcc -no-pie $asm; then
@@ -222,9 +222,9 @@ echo "-----------------"
 
 timeout="why3-cpulimit 30 0 -h"
 
-for f in exec/*.jl; do
+for f in tests/exec/*.jl; do
     echo -n "."
-    expected=exec/`basename $f .jl`.out
+    expected=tests/exec/`basename $f .jl`.out
     max=`expr $max + 1`;
     rm -f out
     if $compilo $f > out; then
@@ -244,7 +244,7 @@ echo
 echo "Execution conduisant à un échec"
 echo "-------------------------------"
 
-for f in exec-fail/*.jl; do
+for f in tests/exec-fail/*.jl; do
     echo -n "."
     max=`expr $max + 1`;
     if $compilo $f > /dev/null 2>&1; then

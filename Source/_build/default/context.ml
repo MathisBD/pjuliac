@@ -3,9 +3,7 @@ open Type_ast
 type local_scope = {
   locals : (string, var) Hashtbl.t ;
   (* total stack size under %rbp used by local variables. 
-   * doesn't account for function params which are stored above %rbp.
-   * not all variables occupy only one stack slot,
-   * for instance a loop variable occupies 2 slots *)
+   * doesn't account for function params which are stored above %rbp  *)
   mutable stack_size : int
 }
 
@@ -22,7 +20,10 @@ type t = {
   globals : (string, var) Hashtbl.t ;
   mutable local_scopes : local_scope list ;
   (* sum of the stack sizes of local scopes *)
-  mutable stack_size : int
+  mutable stack_size : int ;
+  (* the maximum of all stack sizes since update_frame_size
+   * was last called *)
+  mutable frame_size : int
 }
 
 let create () = {
@@ -34,7 +35,8 @@ let create () = {
 
   globals = Hashtbl.create 4 ;
   local_scopes = [] ;
-  stack_size = 0
+  stack_size = 0 ;
+  frame_size = 0
 }
 
 
@@ -63,6 +65,11 @@ let has_local_scope ctx =
 let outer_scope ctx =
   let scope = List.hd ctx.local_scopes in
   List.of_seq (Hashtbl.to_seq_values scope.locals)
+
+let frame_size ctx = ctx.frame_size
+
+let update_frame_size ctx =
+  ctx.frame_size <- ctx.stack_size
 
 
 (*** FUNCTIONS ***)
@@ -177,7 +184,8 @@ let add_local ctx name =
       then () 
       else loop local_scopes 
   in
-  loop ctx.local_scopes
+  loop ctx.local_scopes;
+  update_frame_size ctx
 
 let add_loop_var ctx name =
   (* loop variables are always new variables in the outer scope *)
@@ -187,6 +195,7 @@ let add_loop_var ctx name =
     index = ctx.stack_size
   } in
   Hashtbl.add outer_scope.locals name entry;
-  outer_scope.stack_size <- outer_scope.stack_size + 2;
-  ctx.stack_size <- ctx.stack_size + 2
+  outer_scope.stack_size <- outer_scope.stack_size + 1;
+  ctx.stack_size <- ctx.stack_size + 1;
+  update_frame_size ctx
 

@@ -1,10 +1,10 @@
-# dune exec ./pjuliac.exe -- test.jl
+# dune exec ./pjuliac.exe -- tmp/test.jl
 # OCAMLPARAM: unset
-# Workspace root: /home/mathis/Desktop/LACOPRO/Projet/Source
-$ /usr/bin/nproc > /tmp/dune3a0a64.output 2> /dev/null
-# Auto-detected concurrency: 12
+# Workspace root: /home/mathis/Desktop/LAPROCO/pjuliac/Source
+$ /usr/bin/nproc > /tmp/duneb42707.output 2> /dev/null
+# Auto-detected concurrency: 4
 # disable binary cache
-$ /usr/bin/ocamlc.opt -config > /tmp/dune401b68.output
+$ /usr/bin/ocamlc.opt -config > /tmp/duneb24ee7.output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -23,13 +23,13 @@ $ /usr/bin/ocamlc.opt -config > /tmp/dune401b68.output
 #  ; env =
 #      map
 #        { "INSIDE_DUNE" :
-#            "/home/mathis/Desktop/LACOPRO/Projet/Source/_build/default"
+#            "/home/mathis/Desktop/LAPROCO/pjuliac/Source/_build/default"
 #        ; "OCAMLFIND_IGNORE_DUPS_IN" :
-#            "/home/mathis/Desktop/LACOPRO/Projet/Source/_build/install/default/lib"
+#            "/home/mathis/Desktop/LAPROCO/pjuliac/Source/_build/install/default/lib"
 #        ; "OCAMLPATH" :
-#            "/home/mathis/Desktop/LACOPRO/Projet/Source/_build/install/default/lib"
+#            "/home/mathis/Desktop/LAPROCO/pjuliac/Source/_build/install/default/lib"
 #        ; "OCAMLTOP_INCLUDE_PATH" :
-#            "/home/mathis/Desktop/LACOPRO/Projet/Source/_build/install/default/lib/toplevel"
+#            "/home/mathis/Desktop/LAPROCO/pjuliac/Source/_build/install/default/lib/toplevel"
 #        ; "OCAML_COLOR" : "always"
 #        ; "OPAMCOLOR" : "always"
 #        }
@@ -105,4 +105,4 @@ $ /usr/bin/ocamlc.opt -config > /tmp/dune401b68.output
 #      ; windows_unicode = false
 #      }
 #  }
-# Workspace root: /home/mathis/Desktop/LACOPRO/Projet/Source
+# Workspace root: /home/mathis/Desktop/LAPROCO/pjuliac/Source

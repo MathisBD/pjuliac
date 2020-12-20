@@ -82,8 +82,12 @@ and extract_decl ctx = function
 
 (* second pass *)
 and type_decl ctx = function
-  | PDexpr e -> TDexpr (type_expr ctx e)
+  | PDexpr e -> 
+    Context.update_frame_size ctx;
+    let te = type_expr ctx e in
+    TDexpr (te, Context.frame_size ctx)
   | PDfunc f -> 
+    Context.update_frame_size ctx;
     Context.open_scope ctx;
     Context.enter_func ctx f.ret_type;
     List.iteri 
@@ -98,7 +102,8 @@ and type_decl ctx = function
       fname = f.fname ;
       param_types = List.map snd f.params ;
       ret_type = f.ret_type ;
-      code = te_code
+      code = te_code ;
+      frame_size = Context.frame_size ctx
     }
   | PDstruct s -> 
     TDstruct {
