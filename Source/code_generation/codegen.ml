@@ -251,26 +251,118 @@ and compile_expr te = match te.expr with
         cmpq (imm uninit_value) !%rax ++ jne l1 ++
         error prg (Printf.sprintf "unitinialized variable %s" (var_name v)) ++
         label l1
+      | FuncParam _ ->
+        (* no need to check for uninitialized value *)
+        movq (ind ~ofs:(rbp_offset v) rbp) !%rax
       | Global g ->
         let l1 = code_label prg in
         movq (lab g.name) !%rax ++
         cmpq (imm uninit_value) !%rax ++ jne l1 ++
         error prg (Printf.sprintf "uninitialized variable %s" (var_name v)) ++
         label l1
-      | _ -> failwith "not implemented"
     end
   | TEassign_var (v, te1) ->
     compile_expr te1 ++
     begin match v with
       | StackLocal _
-      | LoopVar _ ->
+      | LoopVar _ 
+      | FuncParam _ ->
         movq !%rax (ind ~ofs:(rbp_offset v) rbp)
       | Global g -> 
         register_global prg g.name;
         movq !%rax (lab g.name)
-      | _ -> failwith "not implemented"
     end
+
+  | TEcall (fname, call_infos, te_args) ->
+    assert (List.length call_infos > 0);
+    let lend = code_label prg in
+    let rec loop = function
+      | [] -> nop
+      | te1 :: te_args ->
+        compile_expr te1 ++
+        pushq !%rax ++
+        loop te_args
+    in
+    (* push the args : first arg is on top of the stack *)
+    loop (List.rev te_args) ++
+    dispatch_call fname call_infos 0 (List.length te_args) lend ++
+    label lend ++
+    (* pop the args *)
+    popn (List.length te_args)
   | _ -> failwith "not implemented"
+
+(* n is the number of arguments
+ * i is the index of the argument we are dispatching against
+ * lend is the label to jump to after the call is completed *)
+and dispatch_call name call_infos i n lend =
+  let call_info_sig = function
+    | FuncCall s -> s
+    | StructCreation s -> s
+  in
+  if List.length call_infos = 0 then
+    error prg (Printf.sprintf 
+      "no overload of function %s matches the given argument types" name)
+  else if i >= n then
+  begin
+    if List.length call_infos > 1
+    then error prg (Printf.sprintf 
+      "multiple overloads of function %s match the given argument types" name)
+    else 
+      (* there must be exactly one call info left *)
+      let ci = List.hd call_infos in
+      match ci with
+        | FuncCall param_types ->
+          call (mangle_name name param_types) ++
+          jmp lend
+        | _ -> failwith "not implemented"
+  end
+  else
+  begin
+    (* split the call infos according to the 
+    * type of their n-th parameter *)
+    let ci_in_group = Hashtbl.create 4 in
+    let assign_group ci =
+      let ty = List.nth (call_info_sig ci) i in
+      let g = 
+        try Hashtbl.find ci_in_group ty
+        with Not_found -> [] 
+      in
+      Hashtbl.add ci_in_group ty (ci :: g)
+    in
+    List.iter assign_group call_infos;
+    let buckets = 
+      Seq.map 
+        (fun (ty, g) -> (ty, g, code_label prg))
+        (Hashtbl.to_seq ci_in_group)
+      |> List.of_seq
+    in
+    (* actual assembly code *)
+    (* get the type of the i-th argument into %rax *)
+    movq (ind ~ofs:(8*i) rsp) !%rax ++
+    movq (ind ~ofs:ofs_type rax) !%rax ++
+    let rec compile_jumps = function
+      | [] -> 
+        (* the argument type doesn't match any call info *)
+        error prg (Printf.sprintf 
+          "no overload of function %s matches the given argument types" name)
+      | (ty, _, la) :: buckets ->
+        cmpq (imm (type_number prg ty)) !%rax ++
+        je la ++
+        compile_jumps buckets
+    in
+    compile_jumps buckets ++
+    (* labels *)
+    let rec compile_labels = function
+      | [] -> nop
+      | (_, group, la) :: tl ->
+        label la ++
+        (* recurse, only with the call-infos
+        * that have parameter i of type compatible with ty *)
+        dispatch_call name group (i+1) n lend ++
+        compile_labels tl 
+    in 
+    compile_labels buckets
+  end
 
 let compile_decl = function
   | TDexpr (te, frame_size) -> 

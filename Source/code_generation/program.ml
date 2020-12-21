@@ -1,5 +1,6 @@
 open X86_64
 open Code_basics
+open Type
 
 
 (* offsets of the different fields in a value, in bytes *)
@@ -11,8 +12,6 @@ let t_nothing = 0
 let t_bool = 1
 let t_int64 = 2
 let t_string = 3
-(* structs start at 4 and go on increasing *)
-let t_struct = 4
 
 let size_of vtype =
   if vtype = t_nothing
@@ -20,6 +19,13 @@ let size_of vtype =
   else if vtype = t_bool || vtype = t_int64 || vtype = t_string
   then 16
   else failwith "not implemented"
+
+let type_number prg = function
+  | Tnothing -> t_nothing
+  | Tbool -> t_bool
+  | Tint64 -> t_int64
+  | Tstring -> t_string
+  | _ -> failwith "not implemented"
 
 (* wrapper around the type program of X86_64 *)
 type t = {
