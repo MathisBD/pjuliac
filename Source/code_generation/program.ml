@@ -29,7 +29,8 @@ type t = {
 
   mutable globals : (string, unit) Hashtbl.t ;
 
-  mutable code : text ;
+  mutable main_code : text ;
+  mutable func_code : text ;
   mutable data : data
 }
 
@@ -37,16 +38,20 @@ let create () =
 {
   sl_num = 0 ; el_num = 0 ; cl_num = 0 ;
   globals = Hashtbl.create 4 ;
-  code = nop ;
-  data = nop
+  main_code = nop ; func_code = nop ; data = nop
 }
 
-let get_code prg = prg.code
+let get_main_code prg = prg.main_code 
+
+let get_func_code prg = prg.func_code
 
 let get_data prg = prg.data
 
 let add_code prg c =
-  prg.code <- prg.code ++ c
+  prg.main_code <- prg.main_code ++ c
+
+let add_func_code prg c =
+  prg.func_code <- prg.func_code ++ c ++ inline "\n"
 
 let add_data prg d =
   prg.data <- prg.data ++ d

@@ -96,19 +96,6 @@ let ni is_last =
 let ci is_last =
   if is_last then "   " else "|  "
 
-let join sep str_list =
-  let buf = Buffer.create 8 in
-  let rec loop = function
-    | [] -> ()
-    | [str] -> Buffer.add_string buf str
-    | str :: str_list ->
-      Buffer.add_string buf str;
-      Buffer.add_string buf sep;
-      loop str_list
-  in
-  loop str_list;
-  Buffer.contents buf
-
 let rec pp_expr fmt prefix is_last e = match e.expr with
   | TEbool b -> 
     fprintf fmt "%s %aTEbool %b\n" (prefix ^ ni is_last) pp_type e.ty b
@@ -187,11 +174,11 @@ and pp_call_info fmt prefix is_last = function
   | FuncCall param_types ->
     fprintf fmt "%s FuncCall (%s)\n" 
       (prefix ^ ni is_last) 
-      (join ", " (List.map type_to_string param_types))
+      (String_utils.join ", " (List.map type_to_string param_types))
   | StructCreation field_types ->
     fprintf fmt "%s StructCreation (%s)\n" 
       (prefix ^ ni is_last) 
-      (join ", " (List.map type_to_string field_types))
+      (String_utils.join ", " (List.map type_to_string field_types))
 
 and pp_multiple_expr fmt prefix is_last e_list =
   let rec loop = function

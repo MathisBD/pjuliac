@@ -1,5 +1,6 @@
 open X86_64
 open Type_ast
+open Type
 
 let syscall_exit = 60
 let error_exit_code = 1
@@ -36,3 +37,8 @@ let uninitialize_vars vars =
     | v :: vars -> uninit_single v ++ loop vars
   in
   loop vars
+
+(* don't use the return type to mangle *)
+let mangle_name fname param_types =
+  let ty_names = List.map type_to_string param_types in
+  fname ^ "_" ^ (String_utils.join "_" ty_names)

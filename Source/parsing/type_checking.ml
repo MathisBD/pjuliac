@@ -43,25 +43,12 @@ let type_list_compatible tl_1 tl_2 =
     | Some _ -> false
 
 
-let join sep str_list =
-  let buf = Buffer.create 8 in
-  let rec loop = function
-    | [] -> ()
-    | [str] -> Buffer.add_string buf str
-    | str :: str_list ->
-      Buffer.add_string buf str;
-      Buffer.add_string buf sep;
-      loop str_list
-  in
-  loop str_list;
-  Buffer.contents buf
-
 (* expect ty to be compatible with a type in ty_list *)
 let expect ty ty_list pos =
   if not (List.exists (type_compatible ty) ty_list) then
   let msg = Printf.sprintf 
     "this expression is expected to have type %s but has type %s"
-    (join " or " (List.map type_to_string ty_list))
+    (String_utils.join " or " (List.map type_to_string ty_list))
     (type_to_string ty)
   in
   error pos msg

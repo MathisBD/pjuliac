@@ -3,7 +3,12 @@ open X86_64
 open Binop
 open Program
 open Code_basics
-open Asm_functions
+
+(* When compiling an expression, the result is in %rax.
+ * As a general rule : values aren't modified, 
+ * we only create new ones (except for mutable structs of course) :
+ * this makes assigning very easy. *)
+
 
 (* global program *)
 let prg = Program.create ()
@@ -18,12 +23,12 @@ let rec compile_binop op te1 te2 =
     let te_true = { ty = Tbool ; expr = TEbool true } in
     compile_expr { ty = Tbool ; expr = TEif (te1, te_true, te2) }
   else   
-    (* te1 in %r8/%rcx
-     * te2 in %r9/%rdx *)
-    compile_expr te1 ++
-    compile_expr te2 ++
-    popq r9 ++ movq (ind ~ofs:ofs_type r9) !%rdx ++     
-    popq r8 ++ movq (ind ~ofs:ofs_type r8) !%rcx ++ 
+    (* te2 in %r8/%rcx
+     * te1 in %rax/%rdx *)
+    compile_expr te2 ++ pushq !%rax ++
+    compile_expr te1 ++ popq r8 ++
+    movq (ind ~ofs:ofs_type r8) !%rcx ++     
+    movq (ind ~ofs:ofs_type rax) !%rdx ++ 
     begin match op with
       | Eq | Neq -> failwith "not implemented"
       | Add | Sub | Mul | Mod | Pow ->
@@ -37,40 +42,36 @@ let rec compile_binop op te1 te2 =
         cmpq (imm t_int64) !%rdx ++ jne lerror ++
         jmp l1 ++
         label lerror ++ error prg error_msg ++
-        (* result in %r8 *)
+        (* result in %rax *)
         label l1 ++
-        movq (ind ~ofs:ofs_data r9) !%r9 ++
+        movq (ind ~ofs:ofs_data rax) !%rax ++
         movq (ind ~ofs:ofs_data r8) !%r8 ++  
         begin match op with
-          | Add -> addq !%r9 !%r8
-          | Sub -> subq !%r9 !%r8
-          | Mul -> imulq !%r9 !%r8
+          | Add -> addq !%r8 !%rax
+          | Sub -> subq !%r8 !%rax
+          | Mul -> imulq !%r8 !%rax
           | Mod -> 
             let l2 = code_label prg in 
-              testq !%r9 !%r9 ++ jnz l2 ++
+              testq !%r8 !%r8 ++ jnz l2 ++
               error prg "modulo by zero" ++
             label l2 ++
               movq (imm 0) !%rdx ++
-              movq !%r8 !%rax ++
-              idivq !%r9 ++ 
-              movq !%rdx !%r8
+              idivq !%r8 ++ 
+              movq !%rdx !%rax
           | Pow -> 
             let l2 = code_label prg in
-              cmpq (imm 0) !%r9 ++ jge l2 ++
+              cmpq (imm 0) !%r8 ++ jge l2 ++
               error prg "negative exponent" ++
             label l2 ++
-              movq !%r8 !%rdi ++
-              movq !%r9 !%rsi ++
-              call "pow" ++
-              movq !%rax !%r8 
+              movq !%rax !%rdi ++
+              movq !%r8 !%rsi ++
+              call "pow"
           | _ -> assert false
         end ++
         (* box the result *)
-        pushq !%r8 ++
+        movq !%rax !%rbx ++ (* %rbx is callee-saved *)
         allocate t_int64 ++
-        popq r8 ++
-        movq !%r8 (ind ~ofs:ofs_data rax) ++
-        pushq !%rax
+        movq !%rbx (ind ~ofs:ofs_data rax)
       | Leq | Lt | Geq | Gt ->
         let l1 = code_label prg in
         let l2 = code_label prg in
@@ -88,98 +89,84 @@ let rec compile_binop op te1 te2 =
         error prg error_msg ++       
         (* order of arguments matters here *)
         label l2 ++
-        movq (ind ~ofs:ofs_data r9) !%r9 ++
+        movq (ind ~ofs:ofs_data rax) !%rax ++
         movq (ind ~ofs:ofs_data r8) !%r8 ++
-        cmpq !%r9 !%r8 ++
-        (* result in %r8 *)
+        cmpq !%r8 !%rax ++
+        (* result in %rbx (callee-saved) *)
         begin match op with
-          | Leq -> setle !%r8b
-          | Lt -> setl !%r8b
-          | Geq -> setge !%r8b
-          | Gt -> setg !%r8b
+          | Leq -> setle !%bl
+          | Lt -> setl !%bl
+          | Geq -> setge !%bl
+          | Gt -> setg !%bl
           | _ -> assert false
         end ++
-        movzbq !%r8b r8 ++
+        movzbq !%bl rbx ++
         (* box the result *)
-        pushq !%r8 ++
         allocate t_bool ++
-        popq r8 ++
-        movq !%r8 (ind ~ofs:ofs_data rax) ++
-        pushq !%rax 
+        movq !%rbx (ind ~ofs:ofs_data rax) 
       | _ -> assert false
     end
 
-    
-(* returns the code to push te on the stack.
- * can add to the data section of the program *)
+  
 and compile_expr te = match te.expr with
   | TEbool b -> 
     let value = if b then 1 else 0 in
     allocate t_bool ++
-    movq (imm value) (ind ~ofs:ofs_data rax) ++
-    pushq !%rax
+    movq (imm value) (ind ~ofs:ofs_data rax)
   | TEint i ->
     allocate t_int64 ++
-    movq (imm64 i) (ind ~ofs:ofs_data rax) ++
-    pushq !%rax
+    movq (imm64 i) (ind ~ofs:ofs_data rax)
   | TEstring s ->
     let slabel = string_label prg s in
     allocate t_string ++
-    movq (ilab slabel) (ind ~ofs:ofs_data rax) ++
-    pushq !%rax
+    movq (ilab slabel) (ind ~ofs:ofs_data rax)
   | TEnot te1 ->
     let l1 = code_label prg in
     compile_expr te1 ++
-    popq r8 ++
-    movq (ind ~ofs:ofs_type r8) !%rcx ++
+    movq (ind ~ofs:ofs_type rax) !%rcx ++
     cmpq (imm t_bool) !%rcx ++ je l1 ++
     error prg "invalid argument type for operator !" ++
-    (* result goes in %r9 *)
+    (* result in %rbx (callee-saved) *)
     label l1 ++
-    movq (imm 1) !%r9 ++
-    xorq (ind ~ofs:ofs_data r8) !%r9 ++
+    movq (imm 1) !%rbx ++
+    xorq (ind ~ofs:ofs_data rax) !%rbx ++
     (* box the result *)
-    pushq !%r9 ++
     allocate t_bool ++
-    popq r9 ++
-    movq !%r9 (ind ~ofs:ofs_data rax) ++
-    pushq !%rax
+    movq !%rbx (ind ~ofs:ofs_data rax)
   | TEbinop (op, te1, te2) -> compile_binop op te1 te2
   | TEprint te_list ->
-    let rec push_args = function
+    let rec print_list = function
       | [] -> nop
       | te :: te_list ->
-        compile_expr te ++ push_args te_list
+        compile_expr te ++ 
+        movq !%rax !%rdi ++
+        call "print" ++
+        print_list te_list
     in
-    push_args (List.rev te_list) ++
-    repeat 
-      (List.length te_list) 
-      (popq rdi ++ call "print") ++
-    allocate t_nothing ++
-    pushq !%rax
+    print_list te_list ++
+    allocate t_nothing
   | TEblock te_list ->
-    let rec push_pop_args = function
-      | [] -> allocate t_nothing ++ pushq !%rax
+    let rec eval_args = function
+      | [] -> allocate t_nothing
       | [te1] -> 
-        (* don't pop the last expression *)
+        (* don't overwrite %rax with 'nothing' *)
         compile_expr te1
       | te1 :: te_list ->
         compile_expr te1 ++
-        popn 1 ++
-        push_pop_args te_list
+        eval_args te_list
     in
-    push_pop_args te_list
+    eval_args te_list
   | TEif (cond, te1, te2) ->
     let l1 = code_label prg in
     let lfalse = code_label prg in
     let lend = code_label prg in
     compile_expr cond ++
-    popq r8 ++ movq (ind ~ofs:ofs_type r8) !%rcx ++
+    movq (ind ~ofs:ofs_type rax) !%rcx ++
     cmpq (imm t_bool) !%rcx ++ je l1 ++
     error prg "invalid condition type in 'if' expression" ++
     label l1 ++
-      movq (ind ~ofs:ofs_data r8) !%r8 ++
-      testq !%r8 !%r8 ++
+      movq (ind ~ofs:ofs_data rax) !%rax ++
+      testq !%rax !%rax ++
       jz lfalse ++
       compile_expr te1 ++
       jmp lend ++
@@ -193,22 +180,19 @@ and compile_expr te = match te.expr with
     jmp lcond ++
     label lbody ++
       compile_expr body ++
-      popn 1 ++
       (* this way the variables are uninitialized after the loop finished.
        * they were already uninitialized before the loop started *)
       uninitialize_vars vars ++
     label lcond ++
       compile_expr cond ++
-      popq r8 ++
-      movq (ind ~ofs:ofs_type r8) !%rcx ++
+      movq (ind ~ofs:ofs_type rax) !%rcx ++
       cmpq (imm t_bool) !%rcx ++ je l1 ++
       error prg "invalid condition type in 'while' expression" ++
     label l1 ++  
-      movq (ind ~ofs:ofs_data r8) !%r8 ++
-      testq !%r8 !%r8 ++
+      movq (ind ~ofs:ofs_data rax) !%rax ++
+      testq !%rax !%rax ++
       jnz lbody ++
-      allocate t_nothing ++
-      pushq !%rax
+      allocate t_nothing
 
   | TEfor (te1, te2, te3, vars) ->
     let l1 = code_label prg in
@@ -218,11 +202,13 @@ and compile_expr te = match te.expr with
     let lv = 
       List.find (function LoopVar _ -> true | _ -> false) vars 
     in
-    compile_expr te1 ++
+    (* lower bound in %r8/%rcx 
+     * upper bound in %rax/%rdx *)
+    compile_expr te1 ++ pushq !%rax ++
     compile_expr te2 ++
-    popq r9 ++ popq r8 ++
+    popq r8 ++
     movq (ind ~ofs:ofs_type r8) !%rcx ++
-    movq (ind ~ofs:ofs_type r9) !%rdx ++
+    movq (ind ~ofs:ofs_type rax) !%rdx ++
       cmpq (imm t_int64) !%rcx ++ je l1 ++
       error prg "invalid 'for' loop bound type" ++
     label l1 ++
@@ -230,10 +216,10 @@ and compile_expr te = match te.expr with
       error prg "invalid 'for' loop bound type" ++
     label l2 ++
       movq (ind ~ofs:ofs_data r8) !%r8 ++
-      movq (ind ~ofs:ofs_data r9) !%r9 ++
+      movq (ind ~ofs:ofs_data rax) !%rax ++
       (* the loop bounds are on the stack
        * (upper bound on top) *)
-      pushq !%r8 ++ pushq !%r9 ++ 
+      pushq !%r8 ++ pushq !%rax ++ 
       (* initialize the "visible" loop variable *)
       allocate t_int64 ++
       movq !%rax (ind ~ofs:(rbp_offset lv) rbp) ++
@@ -246,7 +232,6 @@ and compile_expr te = match te.expr with
       movq !%rcx (ind ~ofs:(rbp_offset lv) rbp) ++
       (* loop body *)
       compile_expr te3 ++
-      popn 1 ++
       uninitialize_vars vars ++
       (* increment the lower bound *)
       incq (ind ~ofs:8 rsp) ++
@@ -255,39 +240,34 @@ and compile_expr te = match te.expr with
       movq (ind rsp) !%r9 ++
       cmpq !%r8 !%r9 ++
       jge lbody ++
-      allocate t_nothing ++
-      pushq !%rax
+      allocate t_nothing
 
   | TEaccess_var v ->
     begin match v with
       | StackLocal _ 
       | LoopVar _ ->
         let l1 = code_label prg in
-        movq (ind ~ofs:(rbp_offset v) rbp) !%r8 ++
-        cmpq (imm uninit_value) !%r8 ++ jne l1 ++
+        movq (ind ~ofs:(rbp_offset v) rbp) !%rax ++
+        cmpq (imm uninit_value) !%rax ++ jne l1 ++
         error prg (Printf.sprintf "unitinialized variable %s" (var_name v)) ++
-        label l1 ++
-        pushq !%r8
+        label l1
       | Global g ->
         let l1 = code_label prg in
-        movq (lab g.name) !%r8 ++
-        cmpq (imm uninit_value) !%r8 ++ jne l1 ++
+        movq (lab g.name) !%rax ++
+        cmpq (imm uninit_value) !%rax ++ jne l1 ++
         error prg (Printf.sprintf "uninitialized variable %s" (var_name v)) ++
-        label l1 ++
-        pushq !%r8
+        label l1
       | _ -> failwith "not implemented"
     end
   | TEassign_var (v, te1) ->
     compile_expr te1 ++
-    (* don't pop the expression *)
-    movq (ind rsp) !%r8 ++
     begin match v with
       | StackLocal _
       | LoopVar _ ->
-        movq !%r8 (ind ~ofs:(rbp_offset v) rbp)
+        movq !%rax (ind ~ofs:(rbp_offset v) rbp)
       | Global g -> 
         register_global prg g.name;
-        movq !%r8 (lab g.name)
+        movq !%rax (lab g.name)
       | _ -> failwith "not implemented"
     end
   | _ -> failwith "not implemented"
@@ -297,25 +277,37 @@ let compile_decl = function
     let code = 
       repeat frame_size (pushq (imm uninit_value)) ++
       compile_expr te ++
-      popn (1 + frame_size) 
+      popn frame_size 
     in
     add_code prg code
+  | TDfunc f ->
+    (* the return value is in %rax *)
+    let code = 
+      label (mangle_name f.fname f.param_types) ++
+      pushq !%rbp ++
+      movq !%rsp !%rbp ++
+      repeat f.frame_size (pushq (imm uninit_value)) ++
+      compile_expr f.code ++
+      leave ++
+      ret
+    in
+    add_func_code prg code
   | _ -> failwith "not implemented"
 
 let compile_prog decls = 
   List.iter compile_decl decls;
+  Asm_functions.add_asm_functions prg;
   let text = 
     globl "main" ++
     label "main" ++
     pushq !%rbp ++
     movq !%rsp !%rbp ++
-    get_code prg ++
+    get_main_code prg ++
     leave ++
     movq (imm 0) !%rax ++
     ret ++ inline "\n" ++
-    label "pow" ++ asm_pow prg ++ inline "\n" ++
-    label "error" ++ asm_error prg ++ inline "\n" ++
-    label "print" ++ asm_print prg ++ inline "\n" in
+    get_func_code prg
+  in
   let data =
     (* do this after having built the whole text *) 
     get_data prg
