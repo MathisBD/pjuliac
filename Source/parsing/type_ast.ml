@@ -31,7 +31,6 @@ and expr =
   | TEaccess_field of typed_expr * string
 
   | TEcall of string * call_info list * typed_expr list
-  | TEdiv of typed_expr * typed_expr
   | TEprint of typed_expr list
   | TEreturn of typed_expr option
 
@@ -144,9 +143,6 @@ let rec pp_expr fmt prefix is_last e = match e.expr with
     fprintf fmt "%s %aTEcall %s\n" (prefix ^ ni is_last) pp_type e.ty fname;
     List.iter (pp_call_info fmt (prefix ^ ci is_last) false) call_infos;
     pp_multiple_expr fmt (prefix ^ ci is_last) true args
-  | TEdiv (e1, e2) ->
-    fprintf fmt "%s %aTEdiv\n" (prefix ^ ni is_last) pp_type e.ty;
-    pp_multiple_expr fmt (prefix ^ ci is_last) true [e1; e2]
   | TEprint (e_list) ->
     fprintf fmt "%s %aTEprint\n" (prefix ^ ni is_last) pp_type e.ty;
     pp_multiple_expr fmt (prefix ^ ci is_last) true e_list

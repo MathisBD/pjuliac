@@ -30,10 +30,10 @@ let type_number prg = function
 (* wrapper around the type program of X86_64 *)
 type t = {
   mutable sl_num : int ;
-  mutable el_num : int ;
   mutable cl_num : int ;
 
   mutable globals : (string, unit) Hashtbl.t ;
+  mutable enclosing_func : Type_ast.func option ;
 
   mutable main_code : text ;
   mutable func_code : text ;
@@ -42,8 +42,9 @@ type t = {
 
 let create () =
 {
-  sl_num = 0 ; el_num = 0 ; cl_num = 0 ;
+  sl_num = 0 ; cl_num = 0 ;
   globals = Hashtbl.create 4 ;
+  enclosing_func = None ;
   main_code = nop ; func_code = nop ; data = nop
 }
 
@@ -74,11 +75,6 @@ let code_label prg =
   prg.cl_num <- 1 + prg.cl_num;
   cl
 
-let error_label prg =
-  let el = Printf.sprintf ".Lerror%d" prg.el_num in
-  prg.el_num <- 1 + prg.el_num;
-  el
-
 (* returns a pointer to the allocated block in %rax *)
 let allocate vtype =
   let size = size_of vtype in
@@ -97,3 +93,25 @@ let error prg msg =
   let msglabel = string_label prg msg in
   movq (ilab msglabel) !%rdi ++
   call "error"
+
+let set_enclosing_func prg f =
+  prg.enclosing_func <- f
+
+(* check the type of the expression in %rax
+ * matches the expected return type of the current function.
+ * doesn't modify the contents of %rax *)
+let check_return_type prg =
+  begin match prg.enclosing_func with
+    | None -> assert false
+    | Some f when f.ret_type = Tany -> nop
+    | Some f ->
+      let lexit = code_label prg in
+      movq (ind ~ofs:ofs_type rax) !%rcx ++
+      cmpq (imm (type_number prg f.ret_type)) !%rcx ++
+      je lexit ++
+      error prg (Printf.sprintf 
+        "invalid type of value returned in function %s (expected %s)" 
+        f.fname
+        (type_to_string f.ret_type)) ++
+      label lexit
+  end

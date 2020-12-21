@@ -3,69 +3,45 @@
 main:
 	pushq %rbp
 	movq %rsp, %rbp
+	movq $16, %rdi
+	call malloc
+	movq $3, 0(%rax)
+	movq $.S1, 8(%rax)
+	pushq %rax
+	movq 0(%rsp), %rax
+	movq 0(%rax), %rax
+	call f_Any
+	jmp .L0
+.L0:
+	addq $8, %rsp
+	movq %rax, %rdi
+	call print
+	movq $16, %rdi
+	call malloc
+	movq $3, 0(%rax)
+	movq $.S0, 8(%rax)
+	movq %rax, %rdi
+	call print
+	movq $8, %rdi
+	call malloc
+	movq $0, 0(%rax)
+	addq $0, %rsp
 	leave
 	movq $0, %rax
-	ret
-
-haha_Int64:
-	pushq %rbp
-	movq %rsp, %rbp
-	movq $8, %rdi
-	call malloc
-	movq $0, 0(%rax)
-	leave
-	ret
-
-haha_Bool:
-	pushq %rbp
-	movq %rsp, %rbp
-	movq $8, %rdi
-	call malloc
-	movq $0, 0(%rax)
-	leave
-	ret
-
-haha_String:
-	pushq %rbp
-	movq %rsp, %rbp
-	movq $8, %rdi
-	call malloc
-	movq $0, 0(%rax)
-	leave
 	ret
 
 f_Any:
 	pushq %rbp
 	movq %rsp, %rbp
 	movq 16(%rbp), %rax
-	pushq %rax
-	movq 0(%rsp), %rax
-	movq 0(%rax), %rax
-	cmpq $2, %rax
-	je .L1
-	cmpq $1, %rax
-	je .L2
-	cmpq $3, %rax
-	je .L3
-	movq $.S0, %rdi
-	call error
-.L1:
-	call haha_Int64
-	jmp .L0
-.L2:
-	call haha_Bool
-	jmp .L0
-.L3:
-	call haha_String
-	jmp .L0
-.L0:
-	addq $8, %rsp
+	leave
+	ret
 	leave
 	ret
 
 error:
 	movq %rdi, %rsi
-	movq $.S1, %rdi
+	movq $.S2, %rdi
 	movq $0, %rax
 	call printf
 	movq $1, %rdi
@@ -73,53 +49,53 @@ error:
 
 pow:
 	movq $1, %rax
-	jmp .L6
-.L4:
+	jmp .L3
+.L1:
 	testq $1, %rsi
-	jz .L5
+	jz .L2
 	imulq %rdi, %rax
-.L5:
+.L2:
 	imulq %rdi, %rdi
 	shrq $1, %rsi
-.L6:
+.L3:
 	testq %rsi, %rsi
-	jnz .L4
+	jnz .L1
 	ret
 
 print:
 	movq 0(%rdi), %rcx
 	cmpq $0, %rcx
-	je .L7
+	je .L4
 	cmpq $1, %rcx
-	je .L8
+	je .L5
 	cmpq $2, %rcx
-	je .L9
+	je .L6
 	cmpq $3, %rcx
-	je .L10
-	movq $.S6, %rdi
+	je .L7
+	movq $.S7, %rdi
 	call error
-.L7:
-	movq $.S5, %rdi
+.L4:
+	movq $.S6, %rdi
 	movq $0, %rax
 	call printf
 	ret
-.L8:
+.L5:
 	movq 8(%rdi), %rax
-	movq $.S3, %rdi
-	testq %rax, %rax
-	jnz .L11
 	movq $.S4, %rdi
-.L11:
+	testq %rax, %rax
+	jnz .L8
+	movq $.S5, %rdi
+.L8:
 	movq $0, %rax
 	call printf
 	ret
-.L9:
+.L6:
 	movq 8(%rdi), %rsi
-	movq $.S2, %rdi
+	movq $.S3, %rdi
 	movq $0, %rax
 	call printf
 	ret
-.L10:
+.L7:
 	movq 8(%rdi), %rdi
 	movq $0, %rax
 	call printf
@@ -127,16 +103,18 @@ print:
 
 	.data
 .S0:
-	.string "no overload of function haha matches the given argument types"
+	.string "\n"
 .S1:
-	.string "runtime error: %s\n"
+	.string "hello"
 .S2:
-	.string "%lld"
+	.string "runtime error: %s\n"
 .S3:
-	.string "true"
+	.string "%lld"
 .S4:
-	.string "false"
+	.string "true"
 .S5:
-	.string "nothing"
+	.string "false"
 .S6:
+	.string "nothing"
+.S7:
 	.string "can't print value"

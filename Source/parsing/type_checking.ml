@@ -124,6 +124,7 @@ and type_expr ctx pe = match pe.expr with
         expect te1.ty [Tbool] pe1.pos;
         expect te2.ty [Tbool] pe2.pos;
         Tbool
+      | Div -> assert false (* the parser produces a function call instead *)
     in
     { ty = ty ; expr = TEbinop (op, te1, te2) }
   (* If doesn't introduce a local scope *)
@@ -176,7 +177,7 @@ and type_expr ctx pe = match pe.expr with
         let te2 = List.nth te_args 1 in
         expect te1.ty [Tint64] pe1.pos;
         expect te2.ty [Tint64] pe2.pos;
-        { ty = Tint64 ; expr = TEdiv (te1, te2) }
+        { ty = Tint64 ; expr = TEbinop (Div, te1, te2) }
       | "print" ->
         { ty = Tnothing ; expr = TEprint te_args }
       | "println" ->

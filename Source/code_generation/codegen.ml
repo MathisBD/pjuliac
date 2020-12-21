@@ -31,9 +31,9 @@ let rec compile_binop op te1 te2 =
     movq (ind ~ofs:ofs_type rax) !%rdx ++ 
     begin match op with
       | Eq | Neq -> failwith "not implemented"
-      | Add | Sub | Mul | Mod | Pow ->
+      | Add | Sub | Mul | Mod | Div | Pow ->
         let l1 = code_label prg in
-        let lerror = error_label prg in
+        let lerror = code_label prg in
         let error_msg = Printf.sprintf
           "invalid argument types for operator %s"
           (binop_to_string op)
@@ -55,9 +55,19 @@ let rec compile_binop op te1 te2 =
               testq !%r8 !%r8 ++ jnz l2 ++
               error prg "modulo by zero" ++
             label l2 ++
-              movq (imm 0) !%rdx ++
+              (* sign extend %rax into %rdx *)
+              cqto ++
               idivq !%r8 ++ 
               movq !%rdx !%rax
+          | Div ->
+            let l2 = code_label prg in 
+              testq !%r8 !%r8 ++ jnz l2 ++
+              error prg "division by zero" ++
+            label l2 ++
+              (* sign extend %rax into %rdx *)
+              cqto ++
+              (* quotient is in %rax *)
+              idivq !%r8
           | Pow -> 
             let l2 = code_label prg in
               cmpq (imm 0) !%r8 ++ jge l2 ++
@@ -289,6 +299,19 @@ and compile_expr te = match te.expr with
     label lend ++
     (* pop the args *)
     popn (List.length te_args)
+
+  | TEreturn te_opt ->
+    (* put the return value in %rax *)
+    begin match te_opt with
+      | None -> allocate t_nothing
+      | Some te1 -> 
+        compile_expr te1
+    end ++
+    check_return_type prg ++
+    (* exit the function *)
+    leave ++
+    ret
+  
   | _ -> failwith "not implemented"
 
 (* n is the number of arguments
@@ -321,18 +344,24 @@ and dispatch_call name call_infos i n lend =
     (* split the call infos according to the 
     * type of their n-th parameter *)
     let ci_in_group = Hashtbl.create 4 in
+    let t_any_group = ref [] in
     let assign_group ci =
       let ty = List.nth (call_info_sig ci) i in
-      let g = 
-        try Hashtbl.find ci_in_group ty
-        with Not_found -> [] 
-      in
-      Hashtbl.add ci_in_group ty (ci :: g)
+      if ty = Tany
+      then t_any_group := ci :: !t_any_group
+      else
+        let g = 
+          try Hashtbl.find ci_in_group ty
+          with Not_found -> [] 
+        in
+        Hashtbl.add ci_in_group ty (ci :: g)
     in
     List.iter assign_group call_infos;
     let buckets = 
       Seq.map 
-        (fun (ty, g) -> (ty, g, code_label prg))
+        (* don't forget to add the call-infos for type Tany
+         * to each group *)
+        (fun (ty, g) -> (ty, g @ !t_any_group, code_label prg))
         (Hashtbl.to_seq ci_in_group)
       |> List.of_seq
     in
@@ -341,16 +370,15 @@ and dispatch_call name call_infos i n lend =
     movq (ind ~ofs:(8*i) rsp) !%rax ++
     movq (ind ~ofs:ofs_type rax) !%rax ++
     let rec compile_jumps = function
-      | [] -> 
-        (* the argument type doesn't match any call info *)
-        error prg (Printf.sprintf 
-          "no overload of function %s matches the given argument types" name)
+      | [] -> nop
       | (ty, _, la) :: buckets ->
         cmpq (imm (type_number prg ty)) !%rax ++
         je la ++
         compile_jumps buckets
     in
     compile_jumps buckets ++
+    (* if every jump failed *)
+    dispatch_call name !t_any_group (i+1) n lend ++
     (* labels *)
     let rec compile_labels = function
       | [] -> nop
@@ -373,6 +401,7 @@ let compile_decl = function
     in
     add_code prg code
   | TDfunc f ->
+    set_enclosing_func prg (Some f);
     (* the return value is in %rax *)
     let code = 
       label (mangle_name f.fname f.param_types) ++
@@ -380,13 +409,16 @@ let compile_decl = function
       movq !%rsp !%rbp ++
       repeat f.frame_size (pushq (imm uninit_value)) ++
       compile_expr f.code ++
+      check_return_type prg ++
       leave ++
       ret
     in
-    add_func_code prg code
+    add_func_code prg code;
+    set_enclosing_func prg None
   | _ -> failwith "not implemented"
 
 let compile_prog decls = 
+  set_enclosing_func prg None;
   List.iter compile_decl decls;
   Asm_functions.add_asm_functions prg;
   let text = 
