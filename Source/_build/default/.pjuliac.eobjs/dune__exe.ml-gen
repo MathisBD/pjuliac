@@ -1,5 +1,11 @@
+(** @canonical Dune__exe.Asm_functions *)
+module Asm_functions = Dune__exe__Asm_functions
+
 (** @canonical Dune__exe.Binop *)
 module Binop = Dune__exe__Binop
+
+(** @canonical Dune__exe.Code_basics *)
+module Code_basics = Dune__exe__Code_basics
 
 (** @canonical Dune__exe.Codegen *)
 module Codegen = Dune__exe__Codegen

@@ -2,143 +2,12 @@ open Type_ast
 open X86_64
 open Binop
 open Program
-
-let syscall_exit = 60
-let error_exit_code = 1
-
-(* must be an invalid memory address *)
-let uninit_value = 1
+open Code_basics
+open Asm_functions
 
 (* global program *)
 let prg = Program.create ()
 
-let popn n =
-  addq (imm (8*n)) !%rsp
-
-let pushn n =
-  subq (imm (8*n)) !%rsp
-
-let rec repeat n code =
-  if n = 0 then nop
-  else code ++ repeat (n-1) code
-
-
-let rbp_offset = function
-  | StackLocal sl -> -8 * (sl.index +1)
-  | FuncParam fp -> 8 * (fp.index + 2)
-  | LoopVar lv -> -8 * (lv.index + 1)
-  | _ -> assert false
-
-
-let uninitialize_vars vars = 
-  let uninit_single = function
-    | StackLocal _ as v ->
-      movq (imm uninit_value) (ind ~ofs:(rbp_offset v) rbp)
-    | LoopVar _ -> nop (* don't uninitialize loop variables *)
-    | _ -> assert false
-  in
-  let rec loop = function
-    | [] -> nop
-    | v :: vars -> uninit_single v ++ loop vars
-  in
-  loop vars
-
-let error msg =
-  let msglabel = string_label prg msg in
-  movq (ilab msglabel) !%rdi ++
-  call "error"
-
-(* runtime error : the error message is in %rdi *)
-let asm_error =
-  (* the newline is important to flush stdout 
-   * (otherwise call fflush maybe) *)
-  let msg = "runtime error: %s\n" in
-  let msglabel = string_label prg msg in
-  (* print the error message *) 
-  movq !%rdi !%rsi ++
-  movq (ilab msglabel) !%rdi ++
-  movq (imm 0) !%rax ++
-  call "printf" ++
-  (* exit the program *)
-  movq (imm error_exit_code) !%rdi ++
-  (* exit is a libc function *)
-  call "exit"
-
-(* function to compute x**y where
- * x is in %rdi and y is in %rsi
- * (x and y are not addresses but are true numbers here) *)
-let asm_pow =
-  (* at the start of iteration i : 
-   * - %rdi holds x**i
-   * - %rax holds x**(first i bits of y)
-   * - %rsi holds y>>i *)
-  let l0 = code_label prg in
-  let l1 = code_label prg in
-  let l2 = code_label prg in
-    movq (imm 1) !%rax ++
-    jmp l2 ++
-  label l0 ++
-    testq (imm 1) !%rsi ++
-    jz l1 ++
-    imulq !%rdi !%rax ++
-  label l1 ++ 
-    imulq !%rdi !%rdi ++
-    shrq (imm 1) !%rsi ++
-  label l2 ++
-    testq !%rsi !%rsi ++
-    jnz l0 ++
-    ret 
-
-(* function to print a value.
- * the value to print is in %rdi *)
-let asm_print = 
-  let lnothing = code_label prg in
-  let lbool = code_label prg in
-  let lint64 = code_label prg in
-  let lstring = code_label prg in
-  movq (ind ~ofs:ofs_type rdi) !%rcx ++ 
-  cmpq (imm t_nothing) !%rcx ++ je lnothing ++
-  cmpq (imm t_bool) !%rcx ++ je lbool ++
-  cmpq (imm t_int64) !%rcx ++ je lint64 ++
-  cmpq (imm t_string) !%rcx ++ je lstring ++
-  error "can't print value" ++
-  label lnothing ++
-  begin
-    let sl_nothing = string_label prg "nothing" in
-    movq (ilab sl_nothing) !%rdi ++
-    movq (imm 0) !%rax ++
-    call "printf" ++ ret
-  end ++
-  label lbool ++
-  begin
-    let sl_true = string_label prg "true" in
-    let sl_false = string_label prg "false" in
-    let l1 = code_label prg in
-    movq (ind ~ofs:ofs_data rdi) !%rax ++
-    
-    movq (ilab sl_true) !%rdi ++
-    testq !%rax !%rax ++
-    jnz l1 ++
-    movq (ilab sl_false) !%rdi ++
-
-    label l1 ++
-    movq (imm 0) !%rax ++
-    call "printf" ++ ret
-  end ++
-  label lint64 ++
-  begin
-    let sl_format = string_label prg "%d" in
-    movq (ind ~ofs:ofs_data rdi) !%rsi ++
-    movq (ilab sl_format) !%rdi ++
-    movq (imm 0) !%rax ++
-    call "printf" ++ ret
-  end ++
-  label lstring ++
-  begin
-    movq (ind ~ofs:ofs_data rdi) !%rdi ++
-    movq (imm 0) !%rax ++
-    call "printf" ++ ret
-  end
 
 let rec compile_binop op te1 te2 =
   (* compile And and Or as 'if' expressions *)
@@ -167,7 +36,7 @@ let rec compile_binop op te1 te2 =
         cmpq (imm t_int64) !%rcx ++ jne lerror ++
         cmpq (imm t_int64) !%rdx ++ jne lerror ++
         jmp l1 ++
-        label lerror ++ error error_msg ++
+        label lerror ++ error prg error_msg ++
         (* result in %r8 *)
         label l1 ++
         movq (ind ~ofs:ofs_data r9) !%r9 ++
@@ -177,15 +46,23 @@ let rec compile_binop op te1 te2 =
           | Sub -> subq !%r9 !%r8
           | Mul -> imulq !%r9 !%r8
           | Mod -> 
-            movq (imm 0) !%rdx ++
-            movq !%r8 !%rax ++
-            idivq !%r9 ++ 
-            movq !%rdx !%r8
+            let l2 = code_label prg in 
+              testq !%r9 !%r9 ++ jnz l2 ++
+              error prg "modulo by zero" ++
+            label l2 ++
+              movq (imm 0) !%rdx ++
+              movq !%r8 !%rax ++
+              idivq !%r9 ++ 
+              movq !%rdx !%r8
           | Pow -> 
-            movq !%r8 !%rdi ++
-            movq !%r9 !%rsi ++
-            call "pow" ++
-            movq !%rax !%r8 
+            let l2 = code_label prg in
+              cmpq (imm 0) !%r9 ++ jge l2 ++
+              error prg "negative exponent" ++
+            label l2 ++
+              movq !%r8 !%rdi ++
+              movq !%r9 !%rsi ++
+              call "pow" ++
+              movq !%rax !%r8 
           | _ -> assert false
         end ++
         (* box the result *)
@@ -204,11 +81,11 @@ let rec compile_binop op te1 te2 =
         (* check argument types *)
         cmpq (imm t_bool) !%rcx ++ je l1 ++
         cmpq (imm t_int64) !%rcx ++ je l1 ++
-        error error_msg ++
+        error prg error_msg ++
         label l1 ++
         cmpq (imm t_bool) !%rdx ++ je l2 ++
         cmpq (imm t_int64) !%rdx ++ je l2 ++
-        error error_msg ++       
+        error prg error_msg ++       
         (* order of arguments matters here *)
         label l2 ++
         movq (ind ~ofs:ofs_data r9) !%r9 ++
@@ -256,7 +133,7 @@ and compile_expr te = match te.expr with
     popq r8 ++
     movq (ind ~ofs:ofs_type r8) !%rcx ++
     cmpq (imm t_bool) !%rcx ++ je l1 ++
-    error "invalid argument type for operator !" ++
+    error prg "invalid argument type for operator !" ++
     (* result goes in %r9 *)
     label l1 ++
     movq (imm 1) !%r9 ++
@@ -280,12 +157,9 @@ and compile_expr te = match te.expr with
       (popq rdi ++ call "print") ++
     allocate t_nothing ++
     pushq !%rax
-  | TEblock [] ->
-    allocate t_nothing ++
-    pushq !%rax
   | TEblock te_list ->
     let rec push_pop_args = function
-      | [] -> nop
+      | [] -> allocate t_nothing ++ pushq !%rax
       | [te1] -> 
         (* don't pop the last expression *)
         compile_expr te1
@@ -302,7 +176,7 @@ and compile_expr te = match te.expr with
     compile_expr cond ++
     popq r8 ++ movq (ind ~ofs:ofs_type r8) !%rcx ++
     cmpq (imm t_bool) !%rcx ++ je l1 ++
-    error "invalid condition type in 'if' expression" ++
+    error prg "invalid condition type in 'if' expression" ++
     label l1 ++
       movq (ind ~ofs:ofs_data r8) !%r8 ++
       testq !%r8 !%r8 ++
@@ -328,11 +202,14 @@ and compile_expr te = match te.expr with
       popq r8 ++
       movq (ind ~ofs:ofs_type r8) !%rcx ++
       cmpq (imm t_bool) !%rcx ++ je l1 ++
-      error "invalid condition type in 'while' expression" ++
+      error prg "invalid condition type in 'while' expression" ++
     label l1 ++  
       movq (ind ~ofs:ofs_data r8) !%r8 ++
       testq !%r8 !%r8 ++
-      jnz lbody
+      jnz lbody ++
+      allocate t_nothing ++
+      pushq !%rax
+
   | TEfor (te1, te2, te3, vars) ->
     let l1 = code_label prg in
     let l2 = code_label prg in
@@ -347,10 +224,10 @@ and compile_expr te = match te.expr with
     movq (ind ~ofs:ofs_type r8) !%rcx ++
     movq (ind ~ofs:ofs_type r9) !%rdx ++
       cmpq (imm t_int64) !%rcx ++ je l1 ++
-      error "invalid 'for' loop bound type" ++
+      error prg "invalid 'for' loop bound type" ++
     label l1 ++
       cmpq (imm t_int64) !%rdx ++ je l2 ++
-      error "invalid 'for' loop bound type" ++
+      error prg "invalid 'for' loop bound type" ++
     label l2 ++
       movq (ind ~ofs:ofs_data r8) !%r8 ++
       movq (ind ~ofs:ofs_data r9) !%r9 ++
@@ -377,7 +254,9 @@ and compile_expr te = match te.expr with
       movq (ind ~ofs:8 rsp) !%r8 ++
       movq (ind rsp) !%r9 ++
       cmpq !%r8 !%r9 ++
-      jge lbody
+      jge lbody ++
+      allocate t_nothing ++
+      pushq !%rax
 
   | TEaccess_var v ->
     begin match v with
@@ -386,7 +265,14 @@ and compile_expr te = match te.expr with
         let l1 = code_label prg in
         movq (ind ~ofs:(rbp_offset v) rbp) !%r8 ++
         cmpq (imm uninit_value) !%r8 ++ jne l1 ++
-        error (Printf.sprintf "unitinialized variable %s" (var_name v)) ++
+        error prg (Printf.sprintf "unitinialized variable %s" (var_name v)) ++
+        label l1 ++
+        pushq !%r8
+      | Global g ->
+        let l1 = code_label prg in
+        movq (lab g.name) !%r8 ++
+        cmpq (imm uninit_value) !%r8 ++ jne l1 ++
+        error prg (Printf.sprintf "uninitialized variable %s" (var_name v)) ++
         label l1 ++
         pushq !%r8
       | _ -> failwith "not implemented"
@@ -399,6 +285,9 @@ and compile_expr te = match te.expr with
       | StackLocal _
       | LoopVar _ ->
         movq !%r8 (ind ~ofs:(rbp_offset v) rbp)
+      | Global g -> 
+        register_global prg g.name;
+        movq !%r8 (lab g.name)
       | _ -> failwith "not implemented"
     end
   | _ -> failwith "not implemented"
@@ -415,22 +304,23 @@ let compile_decl = function
 
 let compile_prog decls = 
   List.iter compile_decl decls;
-  {
-    text = 
-      globl "main" ++
-      label "main" ++
-      pushq !%rbp ++
-      movq !%rsp !%rbp ++
-      get_code prg ++
-      leave ++
-      movq (imm 0) !%rax ++
-      ret ++ inline "\n" ++
-      label "pow" ++ asm_pow ++ inline "\n" ++
-      label "error" ++ asm_error ++ inline "\n" ++
-      label "print" ++ asm_print ++ inline "\n";
-    data = 
-      get_data prg
-  }
+  let text = 
+    globl "main" ++
+    label "main" ++
+    pushq !%rbp ++
+    movq !%rsp !%rbp ++
+    get_code prg ++
+    leave ++
+    movq (imm 0) !%rax ++
+    ret ++ inline "\n" ++
+    label "pow" ++ asm_pow prg ++ inline "\n" ++
+    label "error" ++ asm_error prg ++ inline "\n" ++
+    label "print" ++ asm_print prg ++ inline "\n" in
+  let data =
+    (* do this after having built the whole text *) 
+    get_data prg
+  in 
+  { text = text ; data = data }
 
 
 

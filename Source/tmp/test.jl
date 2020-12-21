@@ -1,6 +1,5 @@
 
 
-println("hello")
-for i = 2 : 4
-  println("i^2 = ", i^2)
-end
+
+x = 2 ^ 62 + (2 ^ 62 - 1)
+println(x)

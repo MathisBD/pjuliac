@@ -162,8 +162,8 @@ let retrieve_entry ctx name =
 
 
 let add_global ctx name ty =
+  if not (Hashtbl.mem ctx.globals name) then
   let entry = Global { name = name ; ty = ty } in
-  (* TODO : handle multiple global variables with same name *)
   Hashtbl.add ctx.globals name entry
 
 let add_local ctx name =
