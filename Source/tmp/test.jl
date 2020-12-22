@@ -1,10 +1,15 @@
 
 
-struct Kid
+mutable struct Kid
     age :: Int64
     name :: String
 end
 
-bob = Kid(13, "bobby")
-mike = Kid(13, "bobby")
-println(bob == mike)
+struct Student
+    age_ :: Int64
+    name_ :: String
+    grade_ :: Int64
+end
+
+bob.age = 13
+bob = Kid(13, "Bobby")

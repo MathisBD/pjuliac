@@ -2,8 +2,8 @@ open Type_ast
 open X86_64
 open Binop
 open Program
-open Code_basics
 open Type
+open Asm_functions_labels
 
 (* When compiling an expression, the result is in %rax.
  * As a general rule : values aren't modified, 
@@ -23,7 +23,17 @@ let rec compile_binop op te1 te2 =
   else if op = Or then
     let te_true = { ty = Tbool ; expr = TEbool true } in
     compile_expr { ty = Tbool ; expr = TEif (te1, te_true, te2) }
-  else   
+  else if op = Eq then
+    compile_expr te1 ++ pushq !%rax ++
+    compile_expr te2 ++
+    popq rdi ++
+    movq !%rax !%rsi ++
+    call asm_equal_lab
+  else if op = Neq then
+    (* compile Neq as (Not Eq) *)
+    let te_eq = { ty = Tbool ; expr = TEbinop (Eq, te1, te2) } in
+    compile_expr { ty = Tbool ; expr = TEnot te_eq }
+  else  
     (* te2 in %r8/%rcx
      * te1 in %rax/%rdx *)
     compile_expr te2 ++ pushq !%rax ++
@@ -31,7 +41,6 @@ let rec compile_binop op te1 te2 =
     movq (ind ~ofs:ofs_type r8) !%rcx ++     
     movq (ind ~ofs:ofs_type rax) !%rdx ++ 
     begin match op with
-      | Eq | Neq -> failwith "not implemented"
       | Add | Sub | Mul | Mod | Div | Pow ->
         let l1 = code_label prg in
         let lerror = code_label prg in
@@ -76,7 +85,7 @@ let rec compile_binop op te1 te2 =
             label l2 ++
               movq !%rax !%rdi ++
               movq !%r8 !%rsi ++
-              call "pow"
+              call asm_pow_lab
           | _ -> assert false
         end ++
         (* box the result *)
@@ -151,7 +160,7 @@ and compile_expr te = match te.expr with
       | te :: te_list ->
         compile_expr te ++ 
         movq !%rax !%rdi ++
-        call "print" ++
+        call asm_print_lab ++
         print_list te_list
     in
     print_list te_list ++
@@ -509,9 +518,18 @@ let compile_decl = function
 let compile_prog decls = 
   (* init the program data structure *)
   set_enclosing_func prg None;
-  List.iter 
-    (function TDstruct s -> register_struct prg s | _ -> ())
-    decls;
+  let structs = 
+    let rec loop acc = function
+      | [] -> List.rev acc
+      | TDstruct s :: decls -> loop (s :: acc) decls
+      | _ :: decls -> loop acc decls
+    in 
+    loop [] decls 
+  in
+  register_structs prg structs;
+
+  (* add the nothing variable *)
+  add_data prg (label nothing_lab ++ dquad [0]);
 
   List.iter compile_decl decls;
   Asm_functions.add_asm_functions prg;
@@ -520,6 +538,13 @@ let compile_prog decls =
     label "main" ++
     pushq !%rbp ++
     movq !%rsp !%rbp ++
+    (* initialize the nothing variable
+     * (we have to do it without calling allocate) *)
+    movq (imm (size_of prg t_nothing)) !%rdi ++
+    call "malloc" ++
+    movq (imm t_nothing) (ind ~ofs:ofs_type rax) ++
+    movq !%rax (lab nothing_lab) ++
+    (* all the global expressions go into main *)
     get_main_code prg ++
     leave ++
     movq (imm 0) !%rax ++

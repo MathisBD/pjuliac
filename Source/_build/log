@@ -1,10 +1,10 @@
-# dune exec ./pjuliac.exe -- tests/exec-fail/undef5.jl
+# dune exec ./pjuliac.exe -- tmp/test.jl
 # OCAMLPARAM: unset
 # Workspace root: /home/mathis/Desktop/LAPROCO/pjuliac/Source
-$ /usr/bin/nproc > /tmp/duneb2971c.output 2> /dev/null
+$ /usr/bin/nproc > /tmp/duned806eb.output 2> /dev/null
 # Auto-detected concurrency: 4
 # disable binary cache
-$ /usr/bin/ocamlc.opt -config > /tmp/duned256c6.output
+$ /usr/bin/ocamlc.opt -config > /tmp/dune3afb05.output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -30,6 +30,8 @@ $ /usr/bin/ocamlc.opt -config > /tmp/duned256c6.output
 #            "/home/mathis/Desktop/LAPROCO/pjuliac/Source/_build/install/default/lib"
 #        ; "OCAMLTOP_INCLUDE_PATH" :
 #            "/home/mathis/Desktop/LAPROCO/pjuliac/Source/_build/install/default/lib/toplevel"
+#        ; "OCAML_COLOR" : "always"
+#        ; "OPAMCOLOR" : "always"
 #        }
 #  ; findlib_path = [ External "/home/mathis/.opam/default/lib" ]
 #  ; arch_sixtyfour = true
