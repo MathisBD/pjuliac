@@ -24,6 +24,9 @@ let rbp_offset = function
   | LoopVar lv -> -8 * (lv.index + 1)
   | _ -> assert false
 
+(* offset of the i-th field in a struct *)
+let field_offset i =
+  8 * (i + 1)
 
 let uninitialize_vars vars = 
   let uninit_single = function

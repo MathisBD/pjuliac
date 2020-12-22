@@ -9,15 +9,6 @@ let error pos msg =
 
 let reserved_func_names = ["div"; "print"; "println"]
 
-let type_equal t1 t2 = match t1, t2 with
-  | Tany, Tany
-  | Tnothing, Tnothing
-  | Tint64, Tint64 
-  | Tbool, Tbool
-  | Tstring, Tstring -> true 
-  | Tstruct s1, Tstruct s2 when s1 = s2 -> true
-  | _ -> false
-
 let type_list_equal tl_1 tl_2 =
   if List.length tl_1 <> List.length tl_2 then false else
   let tl_1_2 = List.combine tl_1 tl_2 in

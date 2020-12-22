@@ -14,3 +14,12 @@ let type_to_string = function
   | Tbool -> "Bool"
   | Tstring -> "String"
   | Tstruct s -> "struct " ^ s 
+
+let type_equal t1 t2 = match t1, t2 with
+  | Tany, Tany
+  | Tnothing, Tnothing
+  | Tint64, Tint64 
+  | Tbool, Tbool
+  | Tstring, Tstring -> true 
+  | Tstruct s1, Tstruct s2 when s1 = s2 -> true
+  | _ -> false

@@ -1,9 +1,10 @@
 
 
-function f(x)
-    return x
+struct Kid
+    age :: Int64
+    name :: String
 end
 
-
-println(f("hello"))
-
+bob = Kid(13, "bobby")
+mike = Kid(13, "bobby")
+println(bob == mike)

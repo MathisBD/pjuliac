@@ -24,8 +24,7 @@ and expr =
   | TEblock of typed_expr list
   
   | TEassign_var of var * typed_expr
-  (* the first field is the struct
-   * the second is the field name *)
+  (* the second is the field name *)
   | TEassign_field of typed_expr * string * typed_expr
   | TEaccess_var of var
   | TEaccess_field of typed_expr * string
@@ -72,6 +71,10 @@ and struc = {
   mutab : bool ;
   fields : (string * ty) list
 }
+
+let call_info_sig = function
+    | FuncCall s -> s
+    | StructCreation s -> s
 
 let var_type = function
   | Global g -> g.ty
