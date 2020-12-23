@@ -13,7 +13,7 @@ let type_to_string = function
   | Tint64 -> "Int64"
   | Tbool -> "Bool"
   | Tstring -> "String"
-  | Tstruct s -> "struct " ^ s 
+  | Tstruct s -> s 
 
 let type_equal t1 t2 = match t1, t2 with
   | Tany, Tany

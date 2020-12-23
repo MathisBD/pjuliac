@@ -27,12 +27,10 @@ let nothing_lab = "nothing"
 
 (* tables (in the data segment) that hold 
  * information about each struct type *)
+(* each entry is 1 byte long *)
 let struct_m_lab = "struct_m_table"
-(* size of an entry in the table *)
-let struct_m_stride = 1
+(* each entry is 8 bytes long *)
 let struct_fc_lab = "struct_fc_table"
-(* size of an entry in the table *)
-let struct_fc_stride = 8
 
 
 (* wrapper around the type program of X86_64 *)
@@ -157,8 +155,10 @@ let type_number prg = function
       with Not_found -> failwith (Printf.sprintf "struct %s is not registered" sname)
     end
 
-(* returns a pointer to a fresh value 
- * of type number vtype in %rax *)
+(* Returns a pointer to a fresh value 
+ * of type number vtype in %rax. 
+ * Calls library functions, so may overwrite all
+ * caller-saved registers. *)
 let allocate prg vtype =
   if vtype = t_nothing then
     (* all values of type Nothing are the same,
@@ -218,28 +218,20 @@ let register_structs prg s_list =
   in 
   List.iteri register s_list;
   (* create tables to hold information about structs
-   * accessible at run-time (e.g. : number of args) *)
-  let rec zero = function
-    | 0 -> []
-    | n -> 0 :: (zero (n-1))
-  in
+  * accessible at run-time (e.g. : number of args) *)
   let m_list = 
-    (* pad with zeros at the start to make accessing
-     * straightforward with the struct number *)
-    (zero t_struct_start) @
-    (List.map (fun s -> (if s.mutab then 1 else 0)) s_list)
+    List.map (fun s -> (if s.mutab then 1 else 0)) s_list
   in
   add_data prg 
     (label struct_m_lab ++ 
     dbyte m_list ++ 
     inline "\n");
   let fc_list =
-    (zero t_struct_start) @
-    (List.map (fun s -> List.length s.fields) s_list)
+    List.map (fun s -> List.length s.fields) s_list
   in
   (* I'm conservative and use a quad for each field count :
-   * it's likely a word or even byte would suffice for hand
-   * written programs, but may not be enough for computer-generated programs *)
+  * it's likely a word or even byte would suffice for hand
+  * written programs, but may not be enough for computer-generated programs *)
   add_data prg 
     (label struct_fc_lab ++ 
     dquad fc_list ++ 

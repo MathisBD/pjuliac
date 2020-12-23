@@ -89,9 +89,10 @@ let rec compile_binop op te1 te2 =
           | _ -> assert false
         end ++
         (* box the result *)
-        movq !%rax !%rbx ++ (* %rbx is callee-saved *)
+        pushq !%rax ++ 
         allocate prg t_int64 ++
-        movq !%rbx (ind ~ofs:ofs_data rax)
+        popq r8 ++
+        movq !%r8 (ind ~ofs:ofs_data rax)
       | Leq | Lt | Geq | Gt ->
         let l1 = code_label prg in
         let l2 = code_label prg in
@@ -112,18 +113,20 @@ let rec compile_binop op te1 te2 =
         movq (ind ~ofs:ofs_data rax) !%rax ++
         movq (ind ~ofs:ofs_data r8) !%r8 ++
         cmpq !%r8 !%rax ++
-        (* result in %rbx (callee-saved) *)
+        (* result in %rax *)
         begin match op with
-          | Leq -> setle !%bl
-          | Lt -> setl !%bl
-          | Geq -> setge !%bl
-          | Gt -> setg !%bl
+          | Leq -> setle !%al
+          | Lt -> setl !%al
+          | Geq -> setge !%al
+          | Gt -> setg !%al
           | _ -> assert false
         end ++
-        movzbq !%bl rbx ++
+        movzbq !%al rax ++
+        pushq !%rax ++
         (* box the result *)
         allocate prg t_bool ++
-        movq !%rbx (ind ~ofs:ofs_data rax) 
+        popq r8 ++
+        movq !%r8 (ind ~ofs:ofs_data rax) 
       | _ -> assert false
     end
 
@@ -146,13 +149,15 @@ and compile_expr te = match te.expr with
     movq (ind ~ofs:ofs_type rax) !%rcx ++
     cmpq (imm t_bool) !%rcx ++ je l1 ++
     error prg "invalid argument type for operator !" ++
-    (* result in %rbx (callee-saved) *)
+    (* result in %r8 *)
     label l1 ++
-    movq (imm 1) !%rbx ++
-    xorq (ind ~ofs:ofs_data rax) !%rbx ++
+    movq (imm 1) !%r8 ++
+    xorq (ind ~ofs:ofs_data rax) !%r8 ++
     (* box the result *)
+    pushq !%r8 ++
     allocate prg t_bool ++
-    movq !%rbx (ind ~ofs:ofs_data rax)
+    popq r8 ++
+    movq !%r8 (ind ~ofs:ofs_data rax)
   | TEbinop (op, te1, te2) -> compile_binop op te1 te2
   | TEprint te_list ->
     let rec print_list = function
@@ -260,6 +265,8 @@ and compile_expr te = match te.expr with
       movq (ind rsp) !%r9 ++
       cmpq !%r8 !%r9 ++
       jge lbody ++
+      (* pop the bounds *)
+      popn 2 ++
       allocate prg t_nothing
 
   | TEaccess_var v ->

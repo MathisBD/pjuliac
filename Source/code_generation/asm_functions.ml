@@ -10,6 +10,9 @@ let asm_error prg =
     string_label prg "runtime error: %s\n" 
   in
   label asm_error_lab ++ 
+    pushq !%rbp ++
+    movq !%rsp !%rbp ++
+
     (* print the error message *) 
     movq !%rdi !%rsi ++
     movq (ilab msglabel) !%rdi ++
@@ -32,6 +35,9 @@ let asm_pow prg =
   let l1 = code_label prg in
   let l2 = code_label prg in
   label asm_pow_lab ++
+    pushq !%rbp ++
+    movq !%rsp !%rbp ++
+
     movq (imm 1) !%rax ++
     jmp l2 ++
   label l0 ++
@@ -44,6 +50,7 @@ let asm_pow prg =
   label l2 ++
     testq !%rsi !%rsi ++
     jnz l0 ++
+    leave ++
     ret 
 
 
@@ -55,6 +62,9 @@ let asm_print prg =
   let lint64 = code_label prg in
   let lstring = code_label prg in
   label asm_print_lab ++
+    pushq !%rbp ++
+    movq !%rsp !%rbp ++
+
     movq (ind ~ofs:ofs_type rdi) !%rcx ++ 
     cmpq (imm t_nothing) !%rcx ++ je lnothing ++
     cmpq (imm t_bool) !%rcx ++ je lbool ++
@@ -66,7 +76,8 @@ let asm_print prg =
     let sl_nothing = string_label prg "nothing" in
     movq (ilab sl_nothing) !%rdi ++
     movq (imm 0) !%rax ++
-    call "printf" ++ ret
+    call "printf" ++ 
+    leave ++ ret
   end ++
   label lbool ++
   begin
@@ -82,7 +93,8 @@ let asm_print prg =
 
     label l1 ++
     movq (imm 0) !%rax ++
-    call "printf" ++ ret
+    call "printf" ++ 
+    leave ++ ret
   end ++
   label lint64 ++
   begin
@@ -90,16 +102,21 @@ let asm_print prg =
     movq (ind ~ofs:ofs_data rdi) !%rsi ++
     movq (ilab sl_format) !%rdi ++
     movq (imm 0) !%rax ++
-    call "printf" ++ ret
+    call "printf" ++ 
+    leave ++ ret
   end ++
   label lstring ++
   begin
     movq (ind ~ofs:ofs_data rdi) !%rdi ++
     movq (imm 0) !%rax ++
-    call "printf" ++ ret
+    call "printf" ++ 
+    leave ++ ret
   end
 
-(* the two values to compare are in %rdi and %rsi *)
+(* The two values to compare are in %rdi and %rsi.
+ * For structs : 
+ * - mutable : just compare the adresses %rdi and %rsi
+ * - non mutable : recursively compare each field *)
 let asm_equal prg =
   let ltrue = code_label prg in
   let lfalse = code_label prg in
@@ -108,6 +125,9 @@ let asm_equal prg =
   let lstring = code_label prg in
   let lstruct = code_label prg in
   label asm_equal_lab ++
+    pushq !%rbp ++
+    movq !%rsp !%rbp ++
+
     movq (ind ~ofs:ofs_type rdi) !%rcx ++
     movq (ind ~ofs:ofs_type rsi) !%rdx ++
     cmpq !%rcx !%rdx ++ jne lfalse ++
@@ -144,16 +164,61 @@ let asm_equal prg =
   end ++
 
   label lstruct ++
-    error prg "equality not implemented" ++
+  begin
+    let lnon_mutab = code_label prg in
+    let lbody = code_label prg in 
+    let lcond = code_label prg in
+      (* check if the struct is mutable *)
+      movq (ilab struct_m_lab) !%r8 ++
+      (* the type is still in %rcx *)
+      movb (ind ~ofs:(-t_struct_start) ~index:rcx ~scale:1 r8) !%r8b ++
+      testb !%r8b !%r8b ++ jz lnon_mutab ++
+      
+    (* mutable : check if the memory addresses are the same *)
+      cmpq !%rdi !%rsi ++
+      je ltrue ++
+      jmp lfalse ++
+      
+    (* non mutable *)
+    label lnon_mutab ++
+      (* get the field count *)
+      movq (ilab struct_fc_lab) !%r8 ++
+      (* the type is still in %rcx *)
+      movq (ind ~ofs:(-8 * t_struct_start) ~index:rcx ~scale:8 r8) !%r8 ++
+      (* loop counter i and arguments on the stack
+       * i starts at 1 to skip the first 8 bytes (type field) *)
+      pushq !%rsi ++ pushq !%rdi ++
+      pushq !%r8 ++ pushq (imm 1) ++
+      jmp lcond ++
+    label lbody ++
+      (* i is in %r8 *)
+      movq (ind ~ofs:16 rsp) !%rdi ++
+      movq (ind ~ofs:24 rsp) !%rsi ++
+      (* compare the i-th field *)
+      movq (ind ~index:r8 ~scale:8 rdi) !%rdi ++
+      movq (ind ~index:r8 ~scale:8 rsi) !%rsi ++
+      call asm_equal_lab ++
+      movq (ind ~ofs:ofs_data rax) !%rax ++
+      testq !%rax !%rax ++
+      jz lfalse ++
+      (* increment i *)
+      incq (ind rsp) ++
+    label lcond ++
+      movq (ind ~ofs:0 rsp) !%r8 ++
+      movq (ind ~ofs:8 rsp) !%r9 ++
+      (* i \in [1, ...,field_count] *) 
+      cmpq !%r8 !%r9 ++ jge lbody ++
+      jmp ltrue      
+  end ++
 
   label ltrue ++
     allocate prg t_bool ++
     movq (imm 1) (ind ~ofs:ofs_data rax) ++
-    ret ++
+    leave ++ ret ++
   label lfalse ++
     allocate prg t_bool ++
     movq (imm 0) (ind ~ofs:ofs_data rax) ++
-    ret
+    leave ++ ret
 
 (* call this function to add all the asm functions
  * of this file to the program *)

@@ -8,6 +8,9 @@ let error pos msg =
   raise (SemanticError (pos, msg))
 
 let reserved_func_names = ["div"; "print"; "println"]
+(* I choose to disallow user-defined structs which could
+ * lead to ambiguities with builtin types *)
+let reserved_struct_names = ["Any"; "Nothing"; "Bool"; "Int64"; "String"]
 
 let type_list_equal tl_1 tl_2 =
   if List.length tl_1 <> List.length tl_2 then false else
@@ -334,7 +337,7 @@ and extract_vars ctx pe = match pe.expr with
 (* adds the function f to the context *)
 and extract_func ctx f =
   if List.mem f.fname reserved_func_names
-  then error f.pos (f.fname ^ " is a reserved identifier")
+  then error f.pos (f.fname ^ " is a reserved function identifier")
   else
   (* check for duplicate param names *)
   let param_names = List.map fst f.params in
@@ -380,9 +383,10 @@ and extract_func ctx f =
 
 and extract_struct ctx s =
   (* don't forget to check for reserved function names *)
-  if List.mem s.sname reserved_func_names
-  then error s.pos (s.sname ^ " is a reserved identifier");
-  (* and duplicate structure names *)
+  if (List.mem s.sname reserved_func_names) ||
+    (List.mem s.sname reserved_struct_names)
+  then error s.pos (s.sname ^ " is a reserved struct identifier");
+  (* check for duplicate structure names *)
   if Context.contains_struct ctx s.sname 
   then error s.pos ("struct " ^ s.sname ^ " is already defined");
   (* check for duplicate field names *)
