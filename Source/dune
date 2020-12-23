@@ -1,4 +1,4 @@
-(ocamllex lexer)
+(include_subdirs unqualified)
 (executable
  (name pjuliac)
  (libraries str))
