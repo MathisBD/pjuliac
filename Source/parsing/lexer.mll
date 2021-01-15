@@ -82,7 +82,13 @@ rule token = parse
     lexbuf.lex_start_p <- start_p;
     STRING s 
   }
-  | num as n { INT (Int64.of_string n) }
+
+  (* special case for -2^63 *)
+  | "-9223372036854775808" as n { INT (Int64.of_string n) }
+  | num as n { 
+    try INT (Int64.of_string n)
+    with _ -> error "invalid integer constant"
+  }
   | ident as i {
     (* keyword *)
     try Hashtbl.find keywords i

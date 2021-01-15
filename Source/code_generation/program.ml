@@ -41,6 +41,8 @@ type t = {
   globals : (string, unit) Hashtbl.t ;
   mutable enclosing_func : Type_ast.func option ;
 
+  string_labels : (string, string) Hashtbl.t ;
+
   struct_type_number : (string, int) Hashtbl.t ;
   (* input : struct type number
    * output : struct size in bytes *)
@@ -59,6 +61,8 @@ let create () =
   
   globals = Hashtbl.create 4 ;
   enclosing_func = None ;
+
+  string_labels = Hashtbl.create 4;
 
   struct_type_number = Hashtbl.create 4 ;
   struct_size = Hashtbl.create 4 ;
@@ -121,12 +125,15 @@ let mangle_name fname param_types =
   let ty_names = List.map type_to_string param_types in
   fname ^ "_" ^ (String_utils.join "_" ty_names)
 
-let string_label prg str = 
-  let sl = Printf.sprintf ".S%d" prg.sl_num in
-  (* TODO : reuse an existing string *)
-  add_data prg (label sl ++ string str);
-  prg.sl_num <- 1 + prg.sl_num;
-  sl
+(* reuses a label if one contains the right string *)
+let string_label prg str =
+  try Hashtbl.find prg.string_labels str
+  with Not_found ->
+    let sl = Printf.sprintf ".S%d" prg.sl_num in
+    prg.sl_num <- 1 + prg.sl_num;
+    Hashtbl.add prg.string_labels str sl;
+    add_data prg (label sl ++ string str);
+    sl
 
 let code_label prg =
   let cl = Printf.sprintf ".L%d" prg.cl_num in

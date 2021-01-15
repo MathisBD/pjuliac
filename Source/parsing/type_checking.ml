@@ -297,7 +297,7 @@ and extract_vars ctx pe = match pe.expr with
   | PEbinop (_, pe1, pe2) ->
     extract_vars ctx pe1;
     extract_vars ctx pe2
-  (* If doesn't introduce a local scope *)
+  (* 'If' doesn't introduce a local scope *)
   | PEif (pe1, pe2, pe3) ->
     extract_vars ctx pe1;
     extract_vars ctx pe2;

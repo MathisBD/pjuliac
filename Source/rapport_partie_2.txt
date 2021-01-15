@@ -1,0 +1,49 @@
+Rapport de la partie 2 du projet de compilation, Mathis Bouverot-Dupuis
+
+Le projet est écrit entièrement en Ocaml et compilé avec Dune.
+
+Explication rapide de la structure du code.
+
+Dossier parsing : analyse lexicale, syntaxique et sémantique.
+- pjuliac.ml : point d'entrée du compilateur, parse les arguments de la ligne de commande et appelle le lexer, 
+le parser puis le type-checker
+- lexer.mll : analyseur lexical, écrit avec ocamllex
+- parser.ml : analyseur syntaxique, écrit à la main (analyseur descendant)
+- pos_ast.ml : arbres de syntaxe produits par le parser et consommés par le type-checker
+(pour les afficher : options --parse-only --verbose)
+- type_checking : typage statique et allocation des variables (sur le tas/globales etc.)
+- type_ast.ml : arbres de syntaxe produits par le typage (pour les afficher : options --type-only --verbose)
+- context.ml : environnement contenant les variables/fonctions/structures du programme, utilisé pendant le typage.
+Cet environnement est divisé en un environnement global et une pile d'environnements locaux.
+
+Dossier code_generation : création du code assembleur.
+- x86_64.ml : bibliothèque pour créer du code assembleur.
+- codegen.ml : fichier principal, parcours les arbres de syntaxe en ajoutant progressivement du code assembleur.
+- program.ml : structure Program qui contient des données sur le programme en train d'etre construit 
+(par exemple sur les labels de différentes variables/strings, et le code assembleur du programme) et quelques fonctions
+pour manipuler du code assembleur.
+- asm_functions.ml/asm_function_labels.ml : fonctions auxiliaires assembleur, par exemple pour afficher une valeur
+ou terminer le programme avec une erreur.
+
+
+Explication de quelques points particuliers :
+
+Il y a des commentaires généraux au début de certains fichiers.
+
+Toutes les valeurs sont allouées sur le tas avec malloc (meme nothing). Toutes les valeurs sont compilées dans %rax.
+Les résultats de fonctions sont aussi dans %rax. Tous les arguments sont passés sur la pile.
+
+Ecrire un parser avec menhir était très compliqué : meme si le code est plus long, 
+j'ai l'impression d'avoir beaucoup plus de controle avec un analyseur écrit à la main qu'avec menhir, 
+avec lequel certains aspects de la syntaxe étaient très embetants à implémenter.
+
+Les tests d'égalité (== et !=) sont implémentés de manière différente pour les structures mutables et non-mutables :
+deux structures non-mutables sont égales si elles ont le meme type et si tous leurs champs sont égaux.
+En revanche, deux structures mutables sont égales seulement si elles sont "physiquement" la meme structure,
+c'est à dire si elles sont stockées à la meme adresse mémoire. 
+
+Dans le code assembleur de chaque programme, je stocke des informations sur les structures 
+(mutabilité et nombre de champs) dans des tables struct_m_table et struct_fc_table.
+
+Implémenter le dispatch pour l'appel de fonctions était assez difficile (la complexité de la fonction 
+dispatch_call en témoigne) mais intéressant.

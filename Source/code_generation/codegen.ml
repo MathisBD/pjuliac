@@ -138,7 +138,10 @@ and compile_expr te = match te.expr with
     movq (imm value) (ind ~ofs:ofs_data rax)
   | TEint i ->
     allocate prg t_int64 ++
-    movq (imm64 i) (ind ~ofs:ofs_data rax)
+    (* can't move a 64 bit immediate into memory,
+     * have to use an intermediate register *)
+    movq (imm64 i) !%rcx ++
+    movq !%rcx (ind ~ofs:ofs_data rax)
   | TEstring s ->
     let slabel = string_label prg s in
     allocate prg t_string ++
@@ -409,7 +412,7 @@ and dispatch_call name call_infos i n lend =
   else
   begin
     (* split the call infos according to the 
-    * type of their n-th parameter *)
+    * type of their i-th parameter *)
     let ci_in_group = Hashtbl.create 4 in
     let t_any_group = ref [] in
     let assign_group ci =
@@ -424,6 +427,7 @@ and dispatch_call name call_infos i n lend =
         Hashtbl.add ci_in_group ty (ci :: g)
     in
     List.iter assign_group call_infos;
+    (* list of (type * call_infos * label) *)
     let buckets = 
       Seq.map 
         (* don't forget to add the call-infos for type Tany
@@ -451,7 +455,7 @@ and dispatch_call name call_infos i n lend =
       | [] -> nop
       | (_, group, la) :: tl ->
         label la ++
-        (* recurse, only with the call-infos
+        (* recurse with only the call-infos
         * that have parameter i of type compatible with ty *)
         dispatch_call name group (i+1) n lend ++
         compile_labels tl 

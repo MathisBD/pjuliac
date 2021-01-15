@@ -45,7 +45,7 @@ Manifest.toml
 *.cmxa
 
 # ocamlbuild working directory
-_build/
+Source/_build/
 
 # ocamlbuild targets
 *.byte
@@ -66,5 +66,9 @@ _opam/
 
 # End of https://www.toptal.com/developers/gitignore/api/ocaml,julia,assembler
 
-tests/
-tmp/
+# Personal
+
+bouverot/
+bouverot.tgz
+Source/tmp/
+Source/tests/

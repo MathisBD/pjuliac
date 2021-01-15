@@ -3,7 +3,7 @@ open Lexer
 open Type
 open Binop
 
-(* READ ME : if you forget how the parser works,
+(* if you forget how the parser works,
  * parse_expr is a good example to look at *)
 
 (* interface for the input of the parser,
@@ -11,7 +11,7 @@ open Binop
 type stream = {
   peek : unit -> token ;
   next : unit -> token ;
-  (* returns the position of the last character of the last token produced *)
+  (* returns the position of the last character of the token that was last produced *)
   last_pos : unit -> position ;
   (* returns the position of the first character of the next token to be produced, 
    * i.e. the token returned by the next call to peek () *)
